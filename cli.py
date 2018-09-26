@@ -2,7 +2,8 @@ import cmd
 import argparse
 import functools
 from glob import glob
-from .database import create_database, get_database_handle
+import config
+from database import create_database, get_database_handle
 from pathlib import Path
 
 parser = argparse.ArgumentParser(prog="Tagger", description="Manages tagged files.")
@@ -48,8 +49,9 @@ def collect_files(values):
 
 def do_init(namespace):
     name = ''.join(namespace.split('.')[:-1])
+    config.name = name
     files = collect_files(namespace.files)
-    create_database(name, files)
+    create_database(files)
 
 
 @database_cognant
@@ -87,8 +89,10 @@ def do_show(db, namespace):
     file_row = db.files.filter_by(filename=namespace.file).one()
     print(file_row)
 
+
 init = subparsers.add_parser('init', help='initializes the folder as tag-aware', action=do_init)
-init.add_argument('--name', metavar='[name]', nargs='?', help='Name of the database.')
+init.add_argument('--name', metavar='[name]', nargs='?', help='Name of the database.',
+                  default='foobar')
 init.add_argument('files', metavar='files', nargs='*')
 init.set_defaults(func=do_init)
 

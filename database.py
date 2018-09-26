@@ -1,28 +1,29 @@
-from sqlalchemy import Table, Column, Integer, String, MetaData, ForeignKey, create_engine
+from sqlalchemy import create_engine
+from models import File, Tag, initialize_tables
 
 
 class DatabaseHandler():
     """ An interface to the database. """
-    DB_URI = "sqlite:///"
+    def __init__(self, db_name):
+        from models import MetaData as meta
+        self.meta = meta
+        DB_URI = "sqlite:///"
+        engine = create_engine(DB_URI + '%s.db' % db_name)
+        self.meta = meta
+        self.meta.reflect(bind=engine)
 
-    def __init__(self, name):
-        self.engine = create_engine(self.DB_URI + '%s.db' % name)
-        self.meta = MetaData()
-        self.meta.reflect(bind=self.engine)
+    def add_file(self, file_name):
+        self.files.insert().values(filename=file_name)
 
-    def initialize_tables(self, *args):
-        files = Table('files', self.meta,
-                      Column('id', Integer, primary_key=True),
-                      Column('filepath', String, nullable=False),
-                      )
-        tags = Table('tags', self.meta,
-                     Column('id', Integer, primary_key=True),
-                     Column('key', String, default=''),
-                     Column('value', String, nullable=False)
-                     )
-        file_tags = Table('file_tags', self.meta,
-                          Column('file_id', ForeignKey('files.id'), primary_key=True),
-                          Column('tag_id', ForeignKey('tags.id'), primary_key=True))
+    def rm_file(self, file_name):
+        self.files.delete().where(self.files.c.filename == file_name)
+
+    def tag_file(self, file_name, value, key='', poly=False):
+        file = self.get_file(file_name)
+        if poly:
+            file.append_tag(key=key, value=value)
+        else:
+            file[key] = value
 
     @property
     def files(self):
@@ -34,10 +35,10 @@ class DatabaseHandler():
         """ Returns a list of Tags. """
         return self.meta.tables['addresses']
 
+
 def get_database_handle(db_name, *args):
     return DatabaseHandler(name=db_name)
 
 
-def create_database(db_name, *args):
-    db = DatabaseHandler(name=db_name)
-    db.initialize_tables(*args)
+def create_database(*args):
+    initialize_tables( *args)
