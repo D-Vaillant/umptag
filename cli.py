@@ -3,6 +3,7 @@ import argparse
 import functools
 from glob import glob
 import config
+import os.path
 from database import create_database, get_database_handle
 from pathlib import Path
 
@@ -11,29 +12,22 @@ subparsers = parser.add_subparsers(help='subparsers help', dest='command')
 
 
 def database_cognant(func, *args):
-    dbs = glob('**/*.db', recursive=True)
-    db_len = len(dbs)
-    if db_len == 0:
-        print("No database found; use `init` first.")
-        exit(1)
-    elif db_len > 1:
-        print("Conflicting databases found: ")
-        for index, db in enumerate(dbs):
-            print("  %d) %s" % (index+1, db))
-        try:
-            inp = int(input("Select a database (1-%d): " % db_len))
-        except ValueError:
-            print("Incorrect entry.")
-            exit(2)
-        if inp not in range(1, db_len+1):
-            print("Out of range.")
-            exit(2)
-        db = dbs[inp]
-    else: 
-        db = dbs[0]
-    # TODO this implements our access to the database
-    db = get_database_handle(db)
-    return functools.partial(func, db)
+    db = find_database()
+    return functools.partial(func, get_database_handle(db))
+
+
+def find_database():
+    cur = os.path.abspath(os.path.curdir)
+    db = os.path.join(cur, '.umptag.db')
+    if os.path.exists(db):
+        return db
+    cur, child = os.path.filedir(cur), cur  # go up the hierarchy
+    while cur != child:  # because the parent dir of '/' is '/'
+        db = os.path.join(cur, '.umptag.db')
+        if os.path.exists(db):
+            return db
+        cur, child = os.path.filedir(cur), cur  # go up the hierarchy
+    raise Exception("No database found.")
 
 
 def collect_files(values):
