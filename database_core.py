@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, ForeignKey
 from sqlalchemy.orm mapper, relationship
 import config
-DB_URI = "sqlite:///"
+
 engine = create_engine(DB_URI + '%s.db' % config.name)
 
 
@@ -14,8 +14,6 @@ def initialize_tables(name, *args):
                        )
 
     _file_table = Table('files', meta,
-                        Column('id', Integer, primary_key=True),
-                        Column('filepath', String, nullable=False),
                         )
 
     _file_tag_junction = Table('file_tags', meta,
