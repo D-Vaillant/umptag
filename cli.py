@@ -4,8 +4,9 @@ import functools
 from glob import glob
 import config
 import os.path
-from database import create_database, get_database_handle, database_cognant
-from pathlib import Path
+from database import database_cognant, create_database
+import models
+import pathlib
 
 
 # Utility function
@@ -20,48 +21,79 @@ def collect_files(values):
     return outputs
 
 
+def split_filepath(filepath):
+    filepath = os.path.abspath(filepath)
+    return os.path.dirname(filepath), os.path.basename(filepath)
+
+
 # The functions invoked by the CLI
 def do_init(namespace):
-    # files = collect_files(namespace.files)
-    create_database('')
+    create_database()
 
 
 @database_cognant
 def do_add(db, namespace):
     files = collect_files(namespace.files)
     for file in files:
-        db.add_file(file)
+        dir, stem = split_filepath(file)
+        f = db.File.get_or_create(directory=dir, name=stem)
+        db.session.add(f)
+    db.session.commit()
 
 
 @database_cognant
 def do_rm(db, namespace):
     files = collect_files(namespace.files)
     for file in files:
-        db.rm_file(file)
+        dir, stem = split_filepath(file)
+        f = db.File.get_or_create(directory=dir, name=stem)
+        if f in File.query:
+            db.session.delete(f)
+    db.session.commit()
 
 
 @database_cognant
 def do_tag(db, namespace):
+    dir, stem = split_filepath(namespace.file)
+    f = db.File.get_or_create(directory=dir, name=stem)
+    tags = []
     for tag in namespace.tags:
+        print("Doing a thing here")
         try:
-            k, v = tag.split(':')
+            k, v = tag.split('=')
         except ValueError:
             k, v = '', tag
-        db.tag_file(namespace.file, value=v, key=k)
+        t = db.Tag.get_or_create(value=v, key=k)
+        f.tags.append(t)
+        tags.append(t)
+    db.session.commit()
+    print(f"Tagged {stem} with {', '.join(str(tag) for tag in tags)}.")
 
 
 @database_cognant
 def do_untag(db, namespace):
+    dir, stem = split_filepath(namespace.file)
+    f = db.File.get_or_create(directory=dir, name=stem)
+    tags = []
     for tag in namespace.tags:
+        print("Doing a thing here")
         try:
-            k, v = tag.split(':')
+            k, v = tag.split('=')
         except ValueError:
             k, v = '', tag
-        db.untag_file(namespace.file, value=v, key=k)
+        t = db.Tag.get_or_create(value=v, key=k)
+        if t in f.tags:
+            f.tags.remove(t)
+            tags.append(t)
+    print(db.session.dirty)
+    print(db.session.new)
+    db.session.commit()
+    print(f"Removed tags from {f.name}: {', '.join(str(tag) for tag in tags)}.")
 
 
 @database_cognant
 def do_merge(db, namespace):
+    # Merge two tags!
     pass
 
 @database_cognant

@@ -1,12 +1,19 @@
+import os
 import os.path
 import functools
+import logging
 from typing import Union
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from models import Base, File, Tag, Key
+from sqlalchemy.orm.query import Query
+from sqlalchemy.ext.declarative import as_declarative
 
 
-def find_database() -> str:
+
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+def find_database():
     cur = os.path.abspath(os.path.curdir)
     db = os.path.join(cur, '.umptag.db')
     if os.path.exists(db):
@@ -17,90 +24,130 @@ def find_database() -> str:
         if os.path.exists(db):
             return db
         cur, child = os.path.dirname(cur), cur  # go up the hierarchy
-    return '.umptag.db'
-    # raise Exception("No database found.")
+    return None
 
 
-DB_URI = "sqlite:///"
-engine = create_engine(DB_URI + find_database())
-Session = sessionmaker(bind=engine)
+class DBHandler:
+    DB_URI = "sqlite:///"
+
+    def __init__(self, db_loc=None):
+        # Setting up the declarative base
+        self._Base = None
+        self._session = None
+        self.db_loc = db_loc
+
+        # Allows us to define the engine later.
+        if self.db_loc is not None:
+            self.bind(self.db_loc)
+        else:
+            self.engine = None
+            self.ss = sessionmaker()
+
+    # Setting up the environment.
+    def bind(self, db_uri):
+        self.db_loc = db_uri
+        self.engine = create_engine(self.DB_URI+db_uri)
+        self.ss = sessionmaker(bind=self.engine)
+
+    @property
+    def session(self):
+        # REQUIRE ENGINE
+        self.require_engine()
+        if self._session is None:
+            self._session = self.ss()
+            self._session.query = self.new_query
+        return self._session
+
+    def new_query(self, *args):
+        q = Query(*args, session=self._session)
+        self._session.add_all(q)
+        return q
+
+
+    # Setting up our declarative base.
+    # Tied into the Handler, so we can access session in our models.
+    @property
+    def Base(self):
+        if self._Base is None:
+            self._Base = self.create_base()
+        return self._Base
+
+    # Lets us use `db.File`, etc.
+    def __getattr__(self, attr):
+        for sc in self.Base.__subclasses__():
+            if sc.__name__ == attr:
+                return sc
+        else:
+            raise AttributeError()
+
+    def create_base(self):
+        @as_declarative()
+        class Base:
+            def __init__(subself, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+
+            @property
+            def query(subself):
+                return self.session.query(subself)
+
+            @classmethod
+            def get_or_create(cls, *args, **kwargs):
+                cls_instance = self.session.query(cls).filter_by(**kwargs).one_or_none()
+                if cls_instance is None:
+                    cls_instance = cls(*args, **kwargs)
+                # We need this or our changes aren't commited.
+                # This is Real Annoying, though!
+                return cls_instance
+
+            @classmethod
+            def provider(cls, func):
+                def output_func(self, session, **kwargs):
+                    cls_instance = cls.get_or_create(session, **kwargs)
+                    return func(self, session, cls_instance)
+                return output_func
+
+            def get(subself, id):
+                inst = subself.query.filter_by(id=id).one()
+                return inst
+        return Base
+
+
+    def create_all(self):
+        self.require_engine()
+        self.Base.metadata.create_all(self.engine)
+
+    def require_engine(self):
+        if self.engine is None:
+            logging.critical("No database found. Run `umptag init` first.")
+            exit(1)
+
+
+
+db = DBHandler(find_database())
+
+
+def create_database():
+    if db.db_loc is None:
+        db.bind('.umptag.db')
+        db.create_all()
+        db.session.commit()
+        print("Database initialized in {}.".format(os.path.abspath(db.db_loc)))
+        exit(0)
+    else:
+        print("Database already exists in {}.".format(db.db_loc))
+        exit(1)
+
+
+"""
+def get_database_handle():
+    db_uri = find_database()
+    if db_uri is None:
+        print("No database detected. Run `umptag init` first.")
+        exit(1)
+    return DBHandler(db_uri)
+"""
 
 
 def database_cognant(func, *args) -> functools.partial:
-    return functools.partial(func, get_database_handle(Session()))
-
-
-class DatabaseHandler():
-    """ An interface to the database. """
-    def __init__(self, session: Session):
-        Base.metadata.reflect(bind=engine)
-        self.session = session
-
-    def get_file(self, filename: str) -> Union[File, None]:
-        """ Returns a File object or None. """
-        filepath = os.path.split(os.path.abspath(filename))
-        directory, name = filepath[:-1], filepath[-1]
-        q = self.session.query(File).filter_by(directory=directory, name=name)
-        return q.first() if q else File(directory=directory, name=name)
-
-    def get_tag(self, value: str, key='') -> Union[Tag, None]:
-        """ Returns a Tag object or None. """
-        q = self.session.query(Tag).filter_by(value=value, key=key)
-        return q.first() if q else Tag(value=value, key=key)
-
-    def add_file(self, filename: str) -> None:
-        file = self.get_file(filename)
-        file.update_time()
-        self.session.merge(file)
-        self.session.commit()
-        # self.files.insert().values(filename=file_name)
-
-    def rm_file(self, filename: str) -> None:
-        file = self.get_file(filename)
-        self.session.delete(file)
-        self.session.commit()
-        # self.files.delete().where(self.files.c.filename == file_name)
-
-    def tag_file(self, filename: str, value: str, key='', poly=False) -> None:
-        file = self.get_file(filename)
-        tag = self.get_tag(value, key)
-        if key == '' or poly:
-            file.append_tag(tag)
-        else:
-            file[key] = value
-        self.session.merge(file)
-        self.session.commit()
-
-    def untag_file(self, filename: str, value: str, key=''):
-        file = self.get_file(filename)
-        tag = self.get_tag(value=value, key=key)
-        if tag in file.tags:
-            file.tags.remove(tag)
-            if not tag.files:
-                self.session.delete(tag)
-            self.session.commit()
-
-
-    @property
-    def files(self):
-        """ Returns a list of Files. """
-        return self.session.query(File)
-        # return self.meta.tables['files']
-
-    @property
-    def tags(self):
-        """ Returns a list of Tags. """
-        return self.session.query(Tag)
-        # return self.meta.tables['addresses']
-
-
-def get_database_handle(session, *args):
-    return DatabaseHandler(session)
-
-
-def create_database(files):
-    engine = create_engine(DB_URI + '.umptag.db')
-    Base.metadata.create_all(engine)
-    sess = Session()
-    sess.merge(Key(id=0, name=''))
-    sess.commit()
+    # print("No database detected. Run `umptag init` first.")
+    return functools.partial(func, db)
