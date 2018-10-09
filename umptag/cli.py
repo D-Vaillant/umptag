@@ -1,118 +1,15 @@
 import argparse
-import functools
-from glob import glob
-import os.path
-import pathlib
-from umptag import create_database, database_cognant
-
-
-# Utility function
-def collect_files(values):
-    # Our weird way of using file extensions.
-    if ',' in values and ' ' not in values:
-        values = values.split(',')
-        values = ['**/*.'+value for value in values]
-    outputs = []
-    for value in values:
-        outputs += glob(value, recursive=True)
-    return outputs
-
-
-def split_filepath(filepath):
-    filepath = os.path.abspath(filepath)
-    return os.path.dirname(filepath), os.path.basename(filepath)
-
-
-# The functions invoked by the CLI
-def do_init(namespace):
-    create_database()
-
-
-@database_cognant
-def do_add(db, namespace):
-    files = collect_files(namespace.files)
-    for file in files:
-        dir, stem = split_filepath(file)
-        f = db.File.get_or_create(directory=dir, name=stem)
-        db.session.add(f)
-    db.session.commit()
-
-
-@database_cognant
-def do_rm(db, namespace):
-    files = collect_files(namespace.files)
-    for file in files:
-        dir, stem = split_filepath(file)
-        f = db.File.get_or_create(directory=dir, name=stem)
-        if f in File.query():
-            db.session.delete(f)
-    db.session.commit()
-
-
-@database_cognant
-def do_tag(db, namespace):
-    dir, stem = split_filepath(namespace.file)
-    f = db.File.get_or_create(directory=dir, name=stem)
-    tags = []
-    for tag in namespace.tags:
-        print("Doing a thing here")
-        try:
-            k, v = tag.split('=')
-        except ValueError:
-            k, v = '', tag
-        t = db.Tag.get_or_create(value=v, key=k)
-        f.tags.append(t)
-        tags.append(t)
-    db.session.commit()
-    print(f"Tagged {stem} with {', '.join(str(tag) for tag in tags)}.")
-
-
-@database_cognant
-def do_untag(db, namespace):
-    dir, stem = split_filepath(namespace.file)
-    f = db.File.get_or_create(directory=dir, name=stem)
-    tags = []
-    for tag in namespace.tags:
-        print("Doing a thing here")
-        try:
-            k, v = tag.split('=')
-        except ValueError:
-            k, v = '', tag
-        t = db.Tag.get_or_create(value=v, key=k)
-        if t in f.tags:
-            f.tags.remove(t)
-            tags.append(t)
-    print(db.session.dirty)
-    print(db.session.new)
-    db.session.commit()
-    print(f"Removed tags from {f.name}: {', '.join(str(tag) for tag in tags)}.")
-
-
-@database_cognant
-def do_merge(db, namespace):
-    # Merge two tags!
-    pass
-
-@database_cognant
-def do_info(db, namespace):
-    most_tagged = max(db.File.query(), key=lambda file: len(file.tags))
-    needs_tags = [file for file in db.File.query() if file.tags == []]
-    all_keys = set(tag.key for tag in db.Tag.query() if tag.key)
-    all_values = set(tag.value for tag in db.Tag.query())
-
-
-@database_cognant
-def do_ls(db, namespace):
-    for file in db.files:
-        print(file)
-
-
-@database_cognant
-def do_show(db, namespace):
-    if namespace.file is None:
-        exit(3)
-    file = db.File.fetch(namespace.file)
-    print(file)
+from umptag.actions import (do_init,
+                            do_add,
+                            do_rm,
+                            do_tag,
+                            do_untag,
+                            do_merge,
+                            do_info,
+                            do_ls,
+                            do_show,
+                            do_clean
+                            )
 
 
 """
@@ -184,6 +81,13 @@ info.set_defaults(func=do_info)
 
 ls = subparsers.add_parser('ls', help='lists all tagged files')
 ls.set_defaults(func=do_ls)
+
+show = subparsers.add_parser('show', help='')
+ls.set_defaults(func=do_show)
+
+clean = subparsers.add_parser('clean', help='cleans superfluous files')
+clean.add_argument('confirm', action='store_true')
+clean.set_defaults(func=do_clean)
 
 def main():
     args = parser.parse_args()

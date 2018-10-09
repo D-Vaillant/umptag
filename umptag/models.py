@@ -60,15 +60,20 @@ class File(db.Base):
 
     @Tag.provider
     def append_tag(self, session, tag):
+        session.add(self)
         self.tags.append(tag)
         session.commit()
 
     @Tag.provider
     def rm_tag(self, session, tag):
+        session.add(self)
         self.tags.remove(tag)
+        session.commit()
 
     def update_time(self):
+        self.session.add(self)
         self.mod_time = datetime.fromtimestamp(os.stat(self.f_path).st_mtime)
+        self.session.commit()
 
     @property
     def f_path(self):

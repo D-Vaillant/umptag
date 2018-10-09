@@ -55,7 +55,7 @@ class DBHandler:
         self.require_engine()
         if self._session is None:
             self._session = self.ss()
-            self._session.query = self.new_query
+            # self._session.query = self.new_query
         return self._session
 
     def new_query(self, *args):
@@ -86,6 +86,7 @@ class DBHandler:
         class Base:
             def __init__(subself, *args, **kwargs):
                 super().__init__(*args, **kwargs)
+                subself.session = self.session
 
             @classmethod
             def query(cls):
@@ -110,6 +111,10 @@ class DBHandler:
             def get(subself, id):
                 inst = subself.query().filter_by(id=id).one()
                 return inst
+
+            def delete(subself):
+                self.session.delete(subself)
+                self.session.commit()
         return Base
 
     # Engine related things.
