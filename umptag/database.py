@@ -63,7 +63,6 @@ class DBHandler:
         self._session.add_all(q)
         return q
 
-
     # Setting up our declarative base.
     # Tied into the Handler, so we can access session in our models.
     @property
@@ -75,10 +74,12 @@ class DBHandler:
     # Lets us use `db.File`, etc.
     def __getattr__(self, attr):
         for sc in self.Base.__subclasses__():
-            if sc.__name__ == attr:
+            if attr == sc.__name__:
                 return sc
+            if attr == sc.__name__.lower()+'s':
+                return sc.query()
         else:
-            raise AttributeError()
+            raise AttributeError
 
     def create_base(self):
         @as_declarative()
@@ -86,9 +87,9 @@ class DBHandler:
             def __init__(subself, *args, **kwargs):
                 super().__init__(*args, **kwargs)
 
-            @property
-            def query(subself):
-                return self.session.query(subself)
+            @classmethod
+            def query(cls):
+                return self.session.query(cls)
 
             @classmethod
             def get_or_create(cls, *args, **kwargs):
@@ -107,11 +108,11 @@ class DBHandler:
                 return output_func
 
             def get(subself, id):
-                inst = subself.query.filter_by(id=id).one()
+                inst = subself.query().filter_by(id=id).one()
                 return inst
         return Base
 
-
+    # Engine related things.
     def create_all(self):
         self.require_engine()
         self.Base.metadata.create_all(self.engine)
@@ -120,7 +121,6 @@ class DBHandler:
         if self.engine is None:
             logging.critical("No database found. Run `umptag init` first.")
             exit(1)
-
 
 
 db = DBHandler(find_database())

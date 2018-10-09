@@ -1,12 +1,9 @@
-import cmd
 import argparse
 import functools
 from glob import glob
-import config
 import os.path
-from database import database_cognant, create_database
-import models
 import pathlib
+from umptag import create_database, database_cognant
 
 
 # Utility function
@@ -47,7 +44,7 @@ def do_rm(db, namespace):
     for file in files:
         dir, stem = split_filepath(file)
         f = db.File.get_or_create(directory=dir, name=stem)
-        if f in File.query:
+        if f in File.query():
             db.session.delete(f)
     db.session.commit()
 
@@ -98,10 +95,10 @@ def do_merge(db, namespace):
 
 @database_cognant
 def do_info(db, namespace):
-    most_tagged = max(db.files, key=lambda file: len(file.tags))
-    needs_tags = [file for file in db.files if file.tags == []]
-    all_keys = set(tag.key for tag in db.tags if tag.key)
-    all_values = set(tag.value for tag in db.tags)
+    most_tagged = max(db.File.query(), key=lambda file: len(file.tags))
+    needs_tags = [file for file in db.File.query() if file.tags == []]
+    all_keys = set(tag.key for tag in db.Tag.query() if tag.key)
+    all_values = set(tag.value for tag in db.Tag.query())
 
 
 @database_cognant
@@ -114,9 +111,7 @@ def do_ls(db, namespace):
 def do_show(db, namespace):
     if namespace.file is None:
         exit(3)
-    file = db.get_file(namespace.file)
-    if file is None:
-        exit(2)
+    file = db.File.fetch(namespace.file)
     print(file)
 
 
@@ -145,12 +140,14 @@ def do_show(db, namespace):
         Include "and", "or", parentheses, negation
 
 """
-parser = argparse.ArgumentParser(prog="Tagger", description="Manages tagged files.")
+parser = argparse.ArgumentParser(prog="umptag", description="Manages tagged files.")
+parser.set_defaults(func=lambda _: parser.print_help())
 subparsers = parser.add_subparsers(help='subparsers help', dest='command')
 
 init = subparsers.add_parser('init', help='initializes the folder as tag-aware')
 init.set_defaults(func=do_init)
 
+"""
 # Manipulate files.
 add = subparsers.add_parser('add', help='adds files to the database')
 add.add_argument('files', metavar='files', nargs='*')
@@ -159,6 +156,7 @@ add.set_defaults(func=do_add)
 rm = subparsers.add_parser('rm', help='removes files from the database')
 rm.add_argument('files', metavar='files', nargs='*')
 rm.set_defaults(func=do_rm)
+"""
 
 # Manipulate tags.
 tag_ = subparsers.add_parser('tag', help='tag a file')
@@ -187,11 +185,7 @@ info.set_defaults(func=do_info)
 ls = subparsers.add_parser('ls', help='lists all tagged files')
 ls.set_defaults(func=do_ls)
 
-
-class TagCmd(cmd.Cmd):
-    prompt = '(pytag)'
-
-if __name__ == "__main__":
+def main():
     args = parser.parse_args()
     args.func(args)
-
+    return 0

@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import List
 from sqlalchemy import Table, Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from database import db
+from .database import db
 
 
 file_tag = Table("file_tag", db.Base.metadata,
@@ -51,6 +51,12 @@ class File(db.Base):
                 size=stat.st_size,
                 is_dir=os.path.isdir(filepath))
         self.update_time()
+
+    @classmethod
+    def fetch(cls, filepath):
+        filepath = os.path.abspath(filepath)
+        dir, name = os.path.dirname(filepath), os.path.basename(filepath)
+        return cls.get_or_create(directory=dir, name=name)
 
     @Tag.provider
     def append_tag(self, session, tag):
