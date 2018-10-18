@@ -54,21 +54,39 @@ class File(db.Base):
 
     @classmethod
     def fetch(cls, filepath):
-        filepath = os.path.abspath(filepath)
-        dir, name = os.path.dirname(filepath), os.path.basename(filepath)
+        try:
+            filepath = os.path.abspath(filepath)
+            dir, name = os.path.dirname(filepath), os.path.basename(filepath)
+        except TypeError:
+            raise FileNotFoundError
         return cls.get_or_create(directory=dir, name=name)
 
-    @Tag.provider
-    def append_tag(self, session, tag):
-        session.add(self)
+    def append_tag(self, key='', value=None,
+            append=False):
+        self.session.add(self)
         self.tags.append(tag)
-        session.commit()
+        self.session.commit()
 
-    @Tag.provider
-    def rm_tag(self, session, tag):
-        session.add(self)
-        self.tags.remove(tag)
-        session.commit()
+    def rm_tag(self, key='', value=None,
+            do_glob=False):
+        self.session.add(self)
+        if do_glob:
+            # TODO figure out how ilike works properly
+            tags = self.session.query(Tag).ilike(key=key, value=value)
+        else:
+            tags = [self.session.query(Tag).filter_by(key=key, value=value).one_or_none()]
+
+        for tag in tags:
+            if tag is None:
+                # The specified tag does not exist.
+                print("Tag does not exist.")
+            else:
+                if tag in self.tags:
+                    # The tag works; hurray.
+                    self.tags.remove(tag)
+                    print("Successfully removed the tag.")
+                else:
+                    print("File not tagged with that.")
 
     def update_time(self):
         self.session.add(self)

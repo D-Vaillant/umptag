@@ -82,8 +82,10 @@ info.set_defaults(func=do_info)
 ls = subparsers.add_parser('ls', help='lists all tagged files')
 ls.set_defaults(func=do_ls)
 
+"""
 show = subparsers.add_parser('show', help='')
-ls.set_defaults(func=do_show)
+show.set_defaults(func=do_show)
+"""
 
 clean = subparsers.add_parser('clean', help='cleans superfluous files')
 clean.add_argument('confirm', action='store_true')

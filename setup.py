@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
         name="umptag",
-        version="0.0.1",
+        version="0.0.2",
         author="David Vaillant",
         author_email="david@vaillant.io",
         description="A tagging utility and package.",
@@ -16,7 +16,7 @@ setuptools.setup(
         python_requires='>=3.6',
         entry_points={
             'console_scripts': [
-                'cli = umptag.cli:main'
+                'umptag = umptag.cli:main'
             ]
         }
 )

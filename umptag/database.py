@@ -9,7 +9,6 @@ from sqlalchemy.orm.query import Query
 from sqlalchemy.ext.declarative import as_declarative
 
 
-
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -86,7 +85,10 @@ class DBHandler:
         class Base:
             def __init__(subself, *args, **kwargs):
                 super().__init__(*args, **kwargs)
-                subself.session = self.session
+
+            @property
+            def session(subself):
+                return self.session
 
             @classmethod
             def query(cls):
