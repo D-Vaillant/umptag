@@ -61,16 +61,56 @@ class File(db.Base):
             raise FileNotFoundError
         return cls.get_or_create(directory=dir, name=name)
 
-    def append_tag(self, key='', value=None,
+File['key'] -> Tag or Tags
+File['key'] = 'value' -> Remove other key tags, add key=value.
+File['key'] += 'value' -> Add key=value.
+
+    def __getitem__(self, key):
+        class TagProxy(list):
+            def __init__(subself, key, *args, **kwargs):
+                subself.key = key
+                subself._update_tags()
+
+            @property
+            def _get_tags(subself):
+                return (tag for tag in self.tags if tag.key == key)
+
+            def _update_tags(subself):
+                super().__init__(subself._get_tags)
+
+            def __eq__(subself, value):
+                remove = [tag for tag in self.tags if tag.value != value]
+                for tag in filter(lambda t: t.value != value, subself._get_tags):
+                    self.rm_tag(tag=tag)
+                if remove:
+                    pass
+                else:
+                    self.append_tag(tag=tag)
+                subself._update_tags()
+
+            def __iadd__(subself, value):
+                self.append_tag(key=subself.key, value=value)
+                subself._update_tags()
+        return TagProxy(key)
+
+    def __setitem__(self, key, value):
+        pass
+
+
+    def append_tag(self, tag=None, key='', value='',
             append=False):
         self.session.add(self)
+        if tag is None:
+            Tag.get_or_create(key=key, value=value)
         self.tags.append(tag)
         self.session.commit()
 
-    def rm_tag(self, key='', value=None,
+    def rm_tag(self, tag=None, key='', value='',
             do_glob=False):
         self.session.add(self)
-        if do_glob:
+        if tag is not None:
+            tags = [tag]
+        elif do_glob:
             # TODO figure out how ilike works properly
             tags = self.session.query(Tag).ilike(key=key, value=value)
         else:
