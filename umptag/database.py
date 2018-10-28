@@ -12,41 +12,21 @@ from sqlalchemy.ext.declarative import as_declarative
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-def find_database():
-    cur = os.path.abspath(os.path.curdir)
-    db = os.path.join(cur, '.umptag.db')
-    if os.path.exists(db):
-        return db
-    cur, child = os.path.dirname(cur), cur  # go up the hierarchy
-    while cur != child:  # because the parent dir of '/' is '/'
-        db = os.path.join(cur, '.umptag.db')
-        if os.path.exists(db):
-            return db
-        cur, child = os.path.dirname(cur), cur  # go up the hierarchy
-    return None
 
-
-class DBHandler:
-    DB_URI = "sqlite:///"
-
-    def __init__(self, db_loc=None):
+class DBCore:
+    def __init__(self, engine=None, declarative_base=None):
         # Setting up the declarative base
-        self._Base = None
         self._session = None
-        self.db_loc = db_loc
 
-        # Allows us to define the engine later.
-        if self.db_loc is not None:
-            self.bind(self.db_loc)
-        else:
-            self.engine = None
-            self.ss = sessionmaker()
+        self.engine = engine
+        self.ss = sessionmaker(engine)
+        # If this errors:
+        # self.ss = sessionmaker()
 
     # Setting up the environment.
-    def bind(self, db_uri):
-        self.db_loc = db_uri
-        self.engine = create_engine(self.DB_URI+db_uri)
-        self.ss = sessionmaker(bind=self.engine)
+    def bind(self, engine):
+        self.engine = engine
+        self.ss.bind(self.engine)
 
     @property
     def session(self):
@@ -57,11 +37,7 @@ class DBHandler:
             # self._session.query = self.new_query
         return self._session
 
-    def new_query(self, *args):
-        q = Query(*args, session=self._session)
-        self._session.add_all(q)
-        return q
-
+    """
     # Setting up our declarative base.
     # Tied into the Handler, so we can access session in our models.
     @property
@@ -103,13 +79,6 @@ class DBHandler:
                 # This is Real Annoying, though!
                 return cls_instance
 
-            @classmethod
-            def provider(cls, func):
-                def output_func(self, session, **kwargs):
-                    cls_instance = cls.get_or_create(session, **kwargs)
-                    return func(self, session, cls_instance)
-                return output_func
-
             def get(subself, id):
                 inst = subself.query().filter_by(id=id).one()
                 return inst
@@ -121,28 +90,16 @@ class DBHandler:
 
     # Engine related things.
     def create_all(self):
-        self.require_engine()
         self.Base.metadata.create_all(self.engine)
 
     def require_engine(self):
         if self.engine is None:
-            logging.critical("No database found. Run `umptag init` first.")
+            logging.critical("No database found. Bind an engine first.") 
             exit(1)
+    """
 
 
-db = DBHandler(find_database())
-
-
-def create_database():
-    if db.db_loc is None:
-        db.bind('.umptag.db')
-        db.create_all()
-        db.session.commit()
-        print("Database initialized in {}.".format(os.path.abspath(db.db_loc)))
-        exit(0)
-    else:
-        print("Database already exists in {}.".format(db.db_loc))
-        exit(1)
+db = DBCore(create_engine(DB_URI+find_database('.umptag.db')))
 
 
 """
