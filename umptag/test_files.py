@@ -22,7 +22,7 @@ class TestFileFunctions(DBTester):
         self.fake_file = self.fs.create_file(self.fake_filepath)
         self.fake_dir = self.fs.create_dir(self.fake_dirpath)
     
-    # Test `get_file`.
+    # Test `_get_file`.
     def test_getter_variation(self):
         for (fp, file) in ((self.fake_filepath, self.fake_file),
                            (self.fake_dirpath, self.fake_dir)):
@@ -38,27 +38,29 @@ class TestFileFunctions(DBTester):
                 # And then we add it and do a variety of tests
                 shiny.add_file(c, fp)
                 # We use this to permute.
-                self.subtest_getter_variations(fp, file, rand_size, rand_time)
+                d, n = os.path.split(fp)
+                all_cols = {"directory": d, "name": n, "mod_time": rand_time,
+                        "size": rand_size, "is_dir": os.path.isdir(fp)}
+                vars = [('directory', 'mod_time', 'size'),
+                        ('name', 'mod_time', 'size'),
+                        ('is_dir', 'size'),
+                        ('name',),
+                        ('directory', 'size')]
+                for var in vars:
+                    with self.subTest(var=var):
+                        self.assertEqual(
+                            tuple(all_cols.get(k) for k in var),
+                            shiny._get_file(self.conn.cursor(),
+                                            fp, cols=var)
+                            )
 
-    def subtest_getter_variations(self, fp, file, size, time):
-        d, n = os.path.split(fp)
-        all_cols = {"directory": d, "name": n, "mod_time": time,
-                "size": size, "is_dir": os.path.isdir(fp)}
-        vars = [('directory', 'mod_time', 'size'),
-                ('name', 'mod_time', 'size'),
-                ('is_dir', 'size'),
-                ('name',),
-                ('directory', 'size')]
-        for var in vars:
-            with self.subTest(var=var):
-                self.assertEqual(
-                        tuple(all_cols.get(k) for k in var),
-                        shiny.get_file(self.conn.cursor(), fp, cols=var)
-                        )
+    def test_get_safety(self):
+        with self.assertRaises(sqlite3.OperationalError):
+            shiny._get_file(self.conn, 'foo', cols=('ashdoaho', 'name'))
 
-    # Test `get_file_from_id`.
-    # def test_get_file_from_id(self):
-        # pass
+    # Test `_get_file_from_id`.
+    def test_get_file_from_id(self):
+        pass
 
     # Test `add_file`.
     def test_add_nonexistent_file(self):
@@ -104,7 +106,7 @@ class TestFileFunctions(DBTester):
         for fp in (self.fake_filepath, self.fake_dirpath):
             with self.subTest(fp=fp):
                 c = self.conn.cursor()
-                got = shiny.get_or_add_file(self.conn.cursor(), fp)
+                got = shiny._get_or_add_file(self.conn.cursor(), fp)
                 # Getting the directory and name. Fragile.
                 got = got[0:2]
                 c = self.conn.cursor()
@@ -121,7 +123,7 @@ class TestFileFunctions(DBTester):
                 c = self.conn.cursor()
                 shiny.add_file(c, fp)
                 # Getting the directory and name. Fragile.
-                got = shiny.get_or_add_file(c, fp)[0:2]
+                got = shiny._get_or_add_file(c, fp)[0:2]
                 self.assertEqual(got, c.execute(
                     """SELECT directory, name FROM files WHERE
                     directory = ? AND

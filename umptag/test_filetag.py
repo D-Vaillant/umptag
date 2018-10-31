@@ -43,9 +43,9 @@ class DBIntegrity(DBTester):
             shiny._column_safety(c, 'files', cols='*')
             shiny._column_safety(c, 'files', cols=('name', 'size', 'is_dir'))
             shiny._column_safety(c, 'files', cols=('directory', 'mod_time', 'is_dir', 'is_dir', 'size'))
-            with self.assertRaises(sqlite3.IntegrityError):
+            with self.assertRaises(sqlite3.OperationalError):
                 shiny._column_safety(c, 'files', cols=('name', 'directory', 'isdir', 'size'))
-            with self.assertRaises(sqlite3.IntegrityError):
+            with self.assertRaises(sqlite3.OperationalError):
                 shiny._column_safety(c, 'files', cols=('dog', 'name', 'is_dir'))
 
     def test_tag_pragma(self):
@@ -53,9 +53,9 @@ class DBIntegrity(DBTester):
             shiny._column_safety(c, 'tags', cols='*')
             shiny._column_safety(c, 'tags', cols=('key', 'value'))
             shiny._column_safety(c, 'tags', cols=('value', 'id', 'id'))
-            with self.assertRaises(sqlite3.IntegrityError):
+            with self.assertRaises(sqlite3.OperationalError):
                 shiny._column_safety(c, 'tags', cols=('valkey',))
-            with self.assertRaises(sqlite3.IntegrityError):
+            with self.assertRaises(sqlite3.OperationalError):
                 shiny._column_safety(c, 'tags', cols=('value', 'id', 'ke'))
 
 

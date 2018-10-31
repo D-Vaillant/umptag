@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
         name="umptag",
-        version="0.0.2",
+        version="0.1.0",
         author="David Vaillant",
         author_email="david@vaillant.io",
         description="A tagging utility and package.",

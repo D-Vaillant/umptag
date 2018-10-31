@@ -18,22 +18,22 @@ class TagTester(DBTester):
 
 
 class TestTagFunctions(TagTester):
-    """ Tests the `get_tag` method. """
-    # Test `get_tag`.
+    """ Tests the `_get_tag` method. """
+    # Test `_get_tag`.
     def test_get_tag(self):
         for pair in self.pairs:
             with self.subTest(pair=pair):
                 c = self.conn.cursor()
                 c.execute("INSERT INTO tags (key, value) VALUES (?,?)", pair)
-                self.assertEqual(pair, shiny.get_tag(c, *pair))
+                self.assertEqual(pair, shiny._get_tag(c, *pair))
 
     def test_getting_none_key(self):
         pair = ('', "foo")
         self.conn.execute("INSERT INTO tags (key, value) VALUES (?,?)", pair).fetchone()
-        got = shiny.get_tag(self.conn, None, "foo")
+        got = shiny._get_tag(self.conn, None, "foo")
         self.assertEqual(('', "foo"), got)
     
-    # Test `get_tag_from_id.`
+    # Test `_get_tag_from_id.`
     # def test_get_tag_from_id(self):
         # pass
 
@@ -64,13 +64,13 @@ class TestTagFunctions(TagTester):
             with self.assertRaises(sqlite3.IntegrityError):
                 shiny.add_tag(c, *pair)
 
-    # Test `get_or_add_tag`.
+    # Test `_get_or_add_tag`.
     def test_tag_getoradd(self):
         for pair in self.pairs:
             with self.subTest(pair=pair):
                 c = self.conn.cursor()
                 # First add.
-                a = shiny.get_or_add_tag(c, *pair)
+                a = shiny._get_or_add_tag(c, *pair)
                 query = c.execute(
                     """SELECT key, value FROM tags WHERE
                     key = ? AND
@@ -78,7 +78,7 @@ class TestTagFunctions(TagTester):
                 self.assertEqual(1, len(query))
                 self.assertEqual(a, query.pop())
                 # Next, get.
-                b = shiny.get_or_add_tag(c, *pair)
+                b = shiny._get_or_add_tag(c, *pair)
                 query = c.execute(
                     """SELECT key, value FROM tags WHERE
                     key = ? AND

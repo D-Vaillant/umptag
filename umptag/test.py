@@ -26,8 +26,8 @@ def suite():
     suite = unittest.TestSuite()
     
     #load('test_files')
-    # load(suite, 'test_tags')
-    # load(suite, 'test_files')
+    load(suite, 'test_tags')
+    load(suite, 'test_files')
     load(suite, 'test_filetag')
     #loadTestsFromName(suite, 'test_filetag_junction')
     # suite.addTest(unittest.defaultTestLoader.loadTestsFromName('test_filetag_junction'))

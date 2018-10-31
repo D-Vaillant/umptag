@@ -31,18 +31,48 @@ def initialize_tables(c):
                         FOREIGN KEY (tag_id) REFERENCES tags (id)
                   )""")
 
+my_tables = ['files', 'tags']
+
 def _column_safety(c, table, cols='*'):
-    if table not in ['files', 'tags']:
+    if table not in my_tables:
         raise sqlite3.IntegrityError
     table_columns = [_[1] for _ in c.execute(f"PRAGMA table_info({table})")]
     if cols == '*' or all(col in table_columns for col in cols):
         return
     else:
-        raise sqlite3.IntegrityError
+        raise sqlite3.OperationalError
+
+def file_safety(cols):
+    # I coded a way to dynamically do this above, but it seems silly to query
+    # the database each time if my columns aren't going to change that much.
+    table_columns = ['id', 'directory', 'name', 'size', 'mod_time', 'is_dir']
+    if cols == '*' or all(col in table_columns for col in cols):
+        return
+    else:
+        raise sqlite3.OperationalError
+
+def tag_safety(cols):
+    table_columns = ['id', 'key', 'value']
+    if cols == '*' or all(col in table_columns for col in cols):
+        return
+    else:
+        raise sqlite3.OperationalError
+
+def fs(func, *args, **kwargs):
+    def new_func(*args, **kwargs):
+        try:
+            file_safety(kwargs['cols'])
+        except KeyError:  # We're using the default argument, which is Safe.
+            pass
+        return func(*args, **kwargs)
+    return new_func
+
+
 
 # Mark these as internal when I get to that point.
 # File functions.
-def get_file(c, path, cols=('directory', 'name')):
+@fs
+def _get_file(c, path, cols=('directory', 'name')):
     """ All values: ("directory", "name", "size", "mod_time", "is_dir")
     `cols` is UNSAFE. """
     # WARNING: Yeah, I'm using the string input thing.
@@ -52,9 +82,9 @@ def get_file(c, path, cols=('directory', 'name')):
 
 def get_file_id(c, path):
     """ Shortcut method. """
-    return get_file(c, path, cols=('id',))[0]
+    return _get_file(c, path, cols=('id',))[0]
 
-def get_file_from_id(c, id, cols=('directory', 'name')):
+def _get_file_from_id(c, id, cols=('directory', 'name')):
     return c.execute(f"""SELECT {', '.join(cols)} FROM files WHERE
             id = ?""", (id,)).fetchone()
 
@@ -70,12 +100,12 @@ def add_file(c, path):
               (directory, name, size, mod_time, is_dir))
     return
 
-def get_or_add_file(c, path, **kw):
+def _get_or_add_file(c, path, **kw):
     try:
         add_file(c, path)
     except sqlite3.IntegrityError:
         pass
-    return get_file(c, path)
+    return _get_file(c, path)
 
 
 # Tag functions.
@@ -84,7 +114,7 @@ def add_tag(c, key, value):
         key = ''
     c.execute("INSERT INTO tags (key, value) VALUES (?,?)", (key, value))
 
-def get_tag(c, key, value, cols=("key", "value")):
+def _get_tag(c, key, value, cols=("key", "value")):
     # In the backend we treat None as '' for key.
     # Possibly doable with pure SQL but right now? Eh.
     if key is None:
@@ -93,17 +123,17 @@ def get_tag(c, key, value, cols=("key", "value")):
                      (key, value)).fetchone()
 
 def get_tag_id(c, key, value):
-    return get_tag(c, key, value, cols=("id",))[0]
+    return _get_tag(c, key, value, cols=("id",))[0]
 
-def get_tag_from_id(c, id, cols=('key', 'value')):
+def _get_tag_from_id(c, id, cols=('key', 'value')):
     return c.execute(f"SELECT {', '.join(cols)} FROM tags WHERE id = ?", (id,)).fetchone()
 
-def get_or_add_tag(c, key, value, **kw):
+def _get_or_add_tag(c, key, value, **kw):
     try:
         add_tag(c, key, value)
     except sqlite3.IntegrityError:
         pass
-    return get_tag(c, key, value, **kw)
+    return _get_tag(c, key, value, **kw)
 
 
 # filetag_junction functions.
@@ -114,14 +144,12 @@ def relate_tag_and_file(c, path, key, value):
             (*os.path.split(path), key, value))
 
 def tags_of_file(c, path, cols=('key', 'value')):
-#file_id = get_file(c, path, cols=('id,')).fetchone()
     res = c.execute(f"""SELECT {', '.join(cols)} FROM filetag_junction J
             INNER JOIN tags ON tags.id = J.tag_id
             INNER JOIN files ON files.id = J.file_id
             WHERE files.directory = ? AND files.name = ?""",
             os.path.split(path))
     return res.fetchall()
-# return [get_tag_from_id(c, tag_id, **kwargs) for tag_id in tag_ids]
 
 def files_of_tag(c, key, value, cols=('directory', 'name')):
     res = c.execute(f"""SELECT {', '.join(cols)} FROM filetag_junction J
@@ -133,8 +161,8 @@ def files_of_tag(c, key, value, cols=('directory', 'name')):
 
 # Actual usage!
 def tag_file(c, path, key="", value=""):
-    filepath = os.path.join(get_or_add_file(c, path))
-    tag = get_or_add_tag(c, key, value)
+    filepath = os.path.join(_get_or_add_file(c, path))
+    tag = _get_or_add_tag(c, key, value)
     relate_tag_and_file(filepath, *tag)
 
 """SELECT {', '.join(('files.'+col for col in cols)} from files INNER JOIN filetag_junction ON file.id = filetag_junction.file_id WHERE filetag_junction.tag_id = N"""
