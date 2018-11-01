@@ -15,7 +15,7 @@ def db_wrap_decorator(func_dec):
             if attr_name.startswith('__'):  # Skip magic methods
                 continue
             attr_value = getattr(cls, attr_name)
-            is hasattr(attr_value, '__call__'):  # Check if attr is function
+            if hasattr(attr_value, '__call__'):  # Check if attr is function
                 setattr(cls, attr_name, func_dec(attr_value))
         return cls
     return class_decorator
