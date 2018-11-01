@@ -4,7 +4,6 @@ import os
 import os.path
 import unittest
 from random import uniform, randrange
-from pyfakefs.fake_filesystem_unittest import TestCase
 # My modules.
 import shiny
 from test import DBTester

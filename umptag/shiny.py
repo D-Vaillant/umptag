@@ -4,6 +4,42 @@ import sqlite3
 import logging
 import os, os.path
 
+""" A preliminary implementation.
+Basically: we'll put all of our Cursor-aware methods into classes,
+decorated as such. We subclass those classes when we get our Connection
+and run `make_decorator` (name pending) to get the decorator that we use on
+our new subclasses.""" 
+def db_wrap_decorator(func_dec):
+    def class_decorator(cls):
+        for attr_name in dir(cls):
+            if attr_name.startswith('__'):  # Skip magic methods
+                continue
+            attr_value = getattr(cls, attr_name)
+            is hasattr(attr_value, '__call__'):  # Check if attr is function
+                setattr(cls, attr_name, func_dec(attr_value))
+        return cls
+    return class_decorator
+
+def make_decorator(conn):
+    @db_wrap_decorator
+    def func_dec(func):
+        def out_func(*args, **kwargs):
+            return func(conn, *args, **kwargs)
+        out_func.__name__ = func.__name__
+        return out_func
+    return func_dec
+
+# func_dec = make_decorator(conn)
+
+""" Alternatively, we can make a class that imports a lot of these things
+and have it implement wrappers around them that automatically plug in the
+Connection (declared as part of the instantiation.)
+So for ConnectionTag, we have self.conn and then:
+    def add_tag(self, *arg, **kw):
+        tags.add_tag(self.conn, *arg, **kw)
+Maybe it would be better to have a Tag class and a ConnectedTag class.
+Or a Connected class which includes all of our public methods we can use.
+"""
 
 def initialize_tables(c):
     """ Creates our tables.
