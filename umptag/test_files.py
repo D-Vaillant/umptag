@@ -9,6 +9,8 @@ from pyfakefs.fake_filesystem_unittest import TestCase
 import shiny
 from test import DBTester
 
+
+
 class FileTester(DBTester):
     def setUp(self):
         super().setUp()
@@ -21,7 +23,10 @@ class TestFileFunctions(DBTester):
         self.fake_dirpath = "dog"
         self.fake_file = self.fs.create_file(self.fake_filepath)
         self.fake_dir = self.fs.create_dir(self.fake_dirpath)
-    
+
+        self.fake_filepaths = [self.make_random_word() for _ in range(3)]
+        self.fake_files = [self.fs.create_file(fs) for fs in self.fake_filepaths]
+
     # Test `_get_file`.
     def test_getter_variation(self):
         for (fp, file) in ((self.fake_filepath, self.fake_file),
@@ -63,6 +68,17 @@ class TestFileFunctions(DBTester):
         pass
 
     # Test `add_file`.
+    def test_add_multiple_files(self):
+        added = []
+        for fp in self.fake_filepaths:
+            added.append(os.path.split(fp))
+            shiny.add_file(self.conn, fp)
+            from_db = self.conn.execute("SELECT directory, name FROM files").fetchall()
+            self.assertEqual(sorted(added), sorted(from_db))
+            all_keys = self.conn.execute("SELECT DISTINCT id FROM files").fetchall()
+            self.assertEqual(len(added), len(all_keys))
+
+
     def test_add_nonexistent_file(self):
         file_path = "djowiajod.txt"
         # Test adding a non-existent file.

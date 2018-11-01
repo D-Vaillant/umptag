@@ -1,4 +1,5 @@
 from datetime import datetime
+import tags
 import sqlite3
 import logging
 import os, os.path
@@ -8,7 +9,7 @@ def initialize_tables(c):
     """ Creates our tables.
     c :: Cursor. """
     c.execute("""CREATE TABLE files
-                  (id integer primary key,
+                  (id integer PRIMARY KEY,
                    directory text NOT NULL,
                    name text NOT NULL,
                    size integer,
@@ -17,7 +18,7 @@ def initialize_tables(c):
                    CONSTRAINT path UNIQUE (directory, name))""")
 
     c.execute("""CREATE TABLE tags
-                  (id integer primary key,
+                  (id integer PRIMARY KEY,
                    key text DEFAULT '' NOT NULL,
                    value text NOT NULL,
                    CONSTRAINT tag_pk UNIQUE (key, value))""")
@@ -46,13 +47,6 @@ def file_safety(cols):
     # I coded a way to dynamically do this above, but it seems silly to query
     # the database each time if my columns aren't going to change that much.
     table_columns = ['id', 'directory', 'name', 'size', 'mod_time', 'is_dir']
-    if cols == '*' or all(col in table_columns for col in cols):
-        return
-    else:
-        raise sqlite3.OperationalError
-
-def tag_safety(cols):
-    table_columns = ['id', 'key', 'value']
     if cols == '*' or all(col in table_columns for col in cols):
         return
     else:
@@ -110,51 +104,6 @@ def _get_or_add_file(c, path, **kw):
     return _get_file(c, path)
 
 # Tag functions.
-def add_tag(c, key, value):
-    logging.debug("-> add_tag <%s:%s>", key, value)
-    c.execute("INSERT INTO tags (key, value) VALUES (?,?)", (key, value))
-
-def _get_tag(c, key, value, cols=("key", "value")):
-    # Deprecated right now.
-    return c.execute(f"SELECT {', '.join(cols)} FROM tags WHERE key = ? AND value = ?",
-                     (key, value)).fetchone()
-
-def get_tag(c, key, value):
-    """ Seemingly pointless but lets us check if the tag is in the database.
-    Why so? Who knows. Maybe an EXISTS check would be better here. """
-    exists = c.execute("SELECT EXISTS (SELECT 1 FROM tags WHERE key = ? AND value = ? LIMIT 1)",
-            (key, value)).fetchone()
-    return (key, value) if exists else None
-    """
-    return c.execute(f"SELECT key, value FROM tags WHERE key = ? AND value = ?",
-                     (key, value)).fetchone()
-    """
-
-def tag_kv_to_id(c, key, value):
-    """ Takes a key and a value and returns the ID (if it exists)."""
-    out = c.execute("SELECT id FROM tags WHERE key = ? AND value = ?",
-                     (key, value)).fetchone()
-    return out if out is None else out[0]
-
-def tag_id_to_kv(c, id):
-    """ Takes an i and returns the key-value pair (if it exists)."""
-    return c.execute("SELECT key, value from tags WHERE id = ?", (id,)).fetchone()
-
-def get_or_add_tag(c, key, value):
-    # Returns a (key, value) pair that's in the database.
-    # Tries to create it and then gets it. Fails if the tag isn't
-    # in the databsae even after trying to create it.
-    try:
-        add_tag(c, key, value)
-    except sqlite3.IntegrityError:
-        # Hopefully it's because of duplicates.
-        pass
-    tag = get_tag(c, key, value)
-    if tag is None:
-        raise sqlite3.DatabaseError("Something went wrong with get_or_add_tag.")
-    return tag
-
-
 # filetag_junction functions.
 def relate_tag_and_file(c, path, key, value):
     c.execute("""INSERT INTO filetag_junction (file_id, tag_id) SELECT
@@ -181,7 +130,7 @@ def files_of_tag(c, key, value, cols=('directory', 'name')):
 # Actual usage!
 def tag_file(c, path, key="", value=""):
     filepath = os.path.join(_get_or_add_file(c, path))
-    add_tag(c, key, value)
+    tags.add_tag(c, key, value)
     try:
         relate_tag_and_file(filepath, key, value)
     except sqlite3.IntegrityError:
