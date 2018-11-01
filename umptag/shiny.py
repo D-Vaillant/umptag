@@ -18,7 +18,7 @@ def initialize_tables(c):
 
     c.execute("""CREATE TABLE tags
                   (id integer primary key,
-                   key text DEFAULT '',
+                   key text DEFAULT '' NOT NULL,
                    value text NOT NULL,
                    CONSTRAINT tag_pk UNIQUE (key, value))""")
 
@@ -69,7 +69,6 @@ def fs(func, *args, **kwargs):
 
 
 
-# Mark these as internal when I get to that point.
 # File functions.
 @fs
 def _get_file(c, path, cols=('directory', 'name')):
@@ -79,6 +78,9 @@ def _get_file(c, path, cols=('directory', 'name')):
     #   I wish I could have figured out a better way.
     return c.execute(f"""SELECT {', '.join(cols)} FROM files WHERE
             directory = ? AND name = ?""", os.path.split(path)).fetchone()
+
+def get_file(c, path):
+    return _get_file(c, path)
 
 def get_file_id(c, path):
     """ Shortcut method. """
@@ -107,33 +109,50 @@ def _get_or_add_file(c, path, **kw):
         pass
     return _get_file(c, path)
 
-
 # Tag functions.
 def add_tag(c, key, value):
-    if key is None:
-        key = ''
+    logging.debug("-> add_tag <%s:%s>", key, value)
     c.execute("INSERT INTO tags (key, value) VALUES (?,?)", (key, value))
 
 def _get_tag(c, key, value, cols=("key", "value")):
-    # In the backend we treat None as '' for key.
-    # Possibly doable with pure SQL but right now? Eh.
-    if key is None:
-        key = ''
+    # Deprecated right now.
     return c.execute(f"SELECT {', '.join(cols)} FROM tags WHERE key = ? AND value = ?",
                      (key, value)).fetchone()
 
-def get_tag_id(c, key, value):
-    return _get_tag(c, key, value, cols=("id",))[0]
+def get_tag(c, key, value):
+    """ Seemingly pointless but lets us check if the tag is in the database.
+    Why so? Who knows. Maybe an EXISTS check would be better here. """
+    exists = c.execute("SELECT EXISTS (SELECT 1 FROM tags WHERE key = ? AND value = ? LIMIT 1)",
+            (key, value)).fetchone()
+    return (key, value) if exists else None
+    """
+    return c.execute(f"SELECT key, value FROM tags WHERE key = ? AND value = ?",
+                     (key, value)).fetchone()
+    """
 
-def _get_tag_from_id(c, id, cols=('key', 'value')):
-    return c.execute(f"SELECT {', '.join(cols)} FROM tags WHERE id = ?", (id,)).fetchone()
+def tag_kv_to_id(c, key, value):
+    """ Takes a key and a value and returns the ID (if it exists)."""
+    out = c.execute("SELECT id FROM tags WHERE key = ? AND value = ?",
+                     (key, value)).fetchone()
+    return out if out is None else out[0]
 
-def _get_or_add_tag(c, key, value, **kw):
+def tag_id_to_kv(c, id):
+    """ Takes an i and returns the key-value pair (if it exists)."""
+    return c.execute("SELECT key, value from tags WHERE id = ?", (id,)).fetchone()
+
+def get_or_add_tag(c, key, value):
+    # Returns a (key, value) pair that's in the database.
+    # Tries to create it and then gets it. Fails if the tag isn't
+    # in the databsae even after trying to create it.
     try:
         add_tag(c, key, value)
     except sqlite3.IntegrityError:
+        # Hopefully it's because of duplicates.
         pass
-    return _get_tag(c, key, value, **kw)
+    tag = get_tag(c, key, value)
+    if tag is None:
+        raise sqlite3.DatabaseError("Something went wrong with get_or_add_tag.")
+    return tag
 
 
 # filetag_junction functions.
@@ -162,8 +181,11 @@ def files_of_tag(c, key, value, cols=('directory', 'name')):
 # Actual usage!
 def tag_file(c, path, key="", value=""):
     filepath = os.path.join(_get_or_add_file(c, path))
-    tag = _get_or_add_tag(c, key, value)
-    relate_tag_and_file(filepath, *tag)
+    add_tag(c, key, value)
+    try:
+        relate_tag_and_file(filepath, key, value)
+    except sqlite3.IntegrityError:
+        logging.info("Tried to add duplicate tag.")
 
 """SELECT {', '.join(('files.'+col for col in cols)} from files INNER JOIN filetag_junction ON file.id = filetag_junction.file_id WHERE filetag_junction.tag_id = N"""
 """SELECT files.id, files.filepath from (INNER JOIN on tags.id = junction.tag_id, INNER JOIN filesfONiles"""

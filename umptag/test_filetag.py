@@ -93,7 +93,7 @@ class TestFiletagJunctionFunctions(JunctionTester):
                     shiny.relate_tag_and_file(c, self.fake_filepath, *pair)
                     # We check that it works by getting the ids directly.
                     file_id = shiny.get_file_id(c, self.fake_filepath)
-                    tag_id = shiny.get_tag_id(c, *pair)
+                    tag_id = shiny.tag_kv_to_id(c, *pair)
                     # Finally, we check if only one row was created in the junction table.
                     res = c.execute("""SELECT * FROM filetag_junction WHERE
                             file_id = ? AND tag_id = ?""", (file_id, tag_id)).fetchall()

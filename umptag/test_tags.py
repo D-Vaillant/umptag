@@ -25,12 +25,13 @@ class TestTagFunctions(TagTester):
             with self.subTest(pair=pair):
                 c = self.conn.cursor()
                 c.execute("INSERT INTO tags (key, value) VALUES (?,?)", pair)
-                self.assertEqual(pair, shiny._get_tag(c, *pair))
+                self.assertEqual(pair, shiny.get_tag(c, *pair))
 
+    @unittest.skip("Getting None has no special cases now.")
     def test_getting_none_key(self):
         pair = ('', "foo")
         self.conn.execute("INSERT INTO tags (key, value) VALUES (?,?)", pair).fetchone()
-        got = shiny._get_tag(self.conn, None, "foo")
+        got = shiny.get_tag(self.conn, None, "foo")
         self.assertEqual(('', "foo"), got)
     
     # Test `_get_tag_from_id.`
@@ -53,9 +54,12 @@ class TestTagFunctions(TagTester):
 
     def test_adding_none_key(self):
         pair = (None, "foo")
-        shiny.add_tag(self.conn, *pair)
+        with self.assertRaises(sqlite3.IntegrityError):
+            shiny.add_tag(self.conn, *pair)
+        """
         res = self.conn.execute("SELECT key, value FROM tags WHERE key = ? AND value = ?",
                 ('' if pair[0] is None else pair[0], pair[1]))
+        """
 
     def test_adding_duplicate_tag(self):
         c = self.conn.cursor()
@@ -70,7 +74,7 @@ class TestTagFunctions(TagTester):
             with self.subTest(pair=pair):
                 c = self.conn.cursor()
                 # First add.
-                a = shiny._get_or_add_tag(c, *pair)
+                a = shiny.get_or_add_tag(c, *pair)
                 query = c.execute(
                     """SELECT key, value FROM tags WHERE
                     key = ? AND
@@ -78,7 +82,7 @@ class TestTagFunctions(TagTester):
                 self.assertEqual(1, len(query))
                 self.assertEqual(a, query.pop())
                 # Next, get.
-                b = shiny._get_or_add_tag(c, *pair)
+                b = shiny.get_or_add_tag(c, *pair)
                 query = c.execute(
                     """SELECT key, value FROM tags WHERE
                     key = ? AND
@@ -86,3 +90,9 @@ class TestTagFunctions(TagTester):
                 self.assertEqual(1, len(query))
                 self.assertEqual(b, query.pop())
                 self.assertEqual(a, b)
+
+    def test_tag_getoradd_failure(self):
+        c = self.conn.cursor()
+        with self.assertRaises(sqlite3.DatabaseError):
+            shiny.get_or_add_tag(c, 'foo', None)
+            shiny.get_or_add_tag(c, None, 'foo')
