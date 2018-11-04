@@ -1,13 +1,12 @@
-import datetime
-import sqlite3
 import os
 import os.path
-import unittest
+from datetime import datetime
 from random import uniform, randrange
+from sqlite3 import IntegrityError, OperationalError
 # My modules.
-import shiny
-from test import DBTester
-
+from .. import shiny
+from . import DBTester
+from .utilities import make_random_word
 
 
 class FileTester(DBTester):
@@ -23,7 +22,7 @@ class TestFileFunctions(DBTester):
         self.fake_file = self.fs.create_file(self.fake_filepath)
         self.fake_dir = self.fs.create_dir(self.fake_dirpath)
 
-        self.fake_filepaths = [self.make_random_word() for _ in range(3)]
+        self.fake_filepaths = [make_random_word() for _ in range(3)]
         self.fake_files = [self.fs.create_file(fs) for fs in self.fake_filepaths]
 
     # Test `_get_file`.
@@ -38,7 +37,7 @@ class TestFileFunctions(DBTester):
                 # Setting file attributes
                 file.st_size = rand_size
                 file.st_mtime = rand_time
-                rand_time = datetime.datetime.fromtimestamp(rand_time)
+                rand_time = datetime.fromtimestamp(rand_time)
                 # And then we add it and do a variety of tests
                 shiny.add_file(c, fp)
                 # We use this to permute.
@@ -59,7 +58,7 @@ class TestFileFunctions(DBTester):
                             )
 
     def test_get_safety(self):
-        with self.assertRaises(sqlite3.OperationalError):
+        with self.assertRaises(OperationalError):
             shiny._get_file(self.conn, 'foo', cols=('ashdoaho', 'name'))
 
     # Test `_get_file_from_id`.
@@ -97,7 +96,7 @@ class TestFileFunctions(DBTester):
         for fp in (self.fake_filepath, self.fake_dirpath):
             c = self.conn.cursor()
             shiny.add_file(c, fp)
-            with self.assertRaises(sqlite3.IntegrityError):
+            with self.assertRaises(IntegrityError):
                 shiny.add_file(c, fp)
 
     def test_correct_metadata(self):
@@ -109,7 +108,7 @@ class TestFileFunctions(DBTester):
                 # Modified Time
                 rand_time = round(uniform(1 * (6**8), 1 * (9**10)), 4)
                 file.st_mtime = rand_time
-                rand_time = datetime.datetime.fromtimestamp(rand_time)
+                rand_time = datetime.fromtimestamp(rand_time)
                 shiny.add_file(self.conn.cursor(), fp)
                 results = self.conn.cursor().execute(
                         "SELECT mod_time, size, is_dir FROM files WHERE directory = ? AND name = ?",

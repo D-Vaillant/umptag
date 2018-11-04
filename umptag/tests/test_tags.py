@@ -1,11 +1,13 @@
-import shiny, tags
-import sqlite3
 import os
 import os.path
 import unittest
-from test import DBTester
-# from random import uniform, randrange
-# from pyfakefs.fake_filesystem_unittest import TestCase
+from sqlite3 import IntegrityError, DatabaseError, OperationalError
+#from umptag import shiny, tags
+from umptag import shiny, tags
+from umptag.tests import DBTester
+from .. import shiny, tags
+# from . import DBTester
+
 
 class TagTester(DBTester):
     def setUp(self):
@@ -49,12 +51,12 @@ class TestTagFunctions(TagTester):
                 self.assertEqual(result, pair)
 
     def test_adding_none_value(self):
-        with self.assertRaises(sqlite3.IntegrityError):
+        with self.assertRaises(IntegrityError):
             tags.add_tag(self.conn, key="", value=None)
 
     def test_adding_none_key(self):
         pair = (None, "foo")
-        with self.assertRaises(sqlite3.IntegrityError):
+        with self.assertRaises(IntegrityError):
             tags.add_tag(self.conn, *pair)
         """
         res = self.conn.execute("SELECT key, value FROM tags WHERE key = ? AND value = ?",
@@ -65,7 +67,7 @@ class TestTagFunctions(TagTester):
         c = self.conn.cursor()
         for pair in self.pairs:
             tags.add_tag(c, *pair)
-            with self.assertRaises(sqlite3.IntegrityError):
+            with self.assertRaises(IntegrityError):
                 tags.add_tag(c, *pair)
 
     # Test `_get_or_add_tag`.
@@ -93,6 +95,6 @@ class TestTagFunctions(TagTester):
 
     def test_tag_getoradd_failure(self):
         c = self.conn.cursor()
-        with self.assertRaises(sqlite3.DatabaseError):
+        with self.assertRaises(DatabaseError):
             tags.get_or_add_tag(c, 'foo', None)
             tags.get_or_add_tag(c, None, 'foo')

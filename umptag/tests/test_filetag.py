@@ -1,45 +1,12 @@
 import logging
-import shiny, tags
-import sqlite3
-import unittest
-from unittest import skip
-import string
 import os
-from test import DBTester
-from random import randint, choice
-
-chars = string.ascii_letters + string.digits
-
-format_ = "%(levelname)s :: %(funcName)s -> %(message)s"
-logging.basicConfig(format=format_, level=logging.INFO)
-
-def make_random_word():
-    return ''.join([choice(chars) for _ in range(randint(4, 8))])
-
-def get_random_hierarchy(structure=((2, 2), (randint(1, 4), 1), (3, 0))):
-        all_files = []
-        all_dirs = []
-        dir_hier = []
-        for (file_count, dir_count) in structure:
-            if dir_hier == []:
-                all_files += [make_random_word() for f in range(file_count)]
-                first_dir_level = [make_random_word() for f in range(dir_count)]
-                dir_hier.append(first_dir_level)
-                all_dirs += first_dir_level
-            else:
-                for file in range(file_count):
-                    parent_dir = os.path.join(*(choice(dir_grp) for dir_grp in dir_hier))
-                    all_files.append(os.path.join(parent_dir, make_random_word()))
-                next_dir_level = [make_random_word() for _ in range(dir_count)]
-                # for dir in range(dir_count):
-                    # dir_name = make_random_word()
-                    # next_dir_level += make_random_word()
-                    # next_dirs.append(os.path.join(parent_dir, make_random_word(), ''))
-                for dir in next_dir_level:
-                    parent_dir = os.path.join(*[choice(dir_grp) for dir_grp in dir_hier])
-                    all_dirs.append(os.path.join(parent_dir, dir, ''))
-                dir_hier.append(next_dir_level)
-        return (all_files, all_dirs)
+import os.path
+from sqlite3 import IntegrityError, OperationalError
+from unittest import skip
+from . import DBTester
+from .utilities import make_random_word, get_random_hierarchy
+from .. import shiny, tags
+# import shiny, tags
 
 
 class DBIntegrity(DBTester):
@@ -48,9 +15,9 @@ class DBIntegrity(DBTester):
             shiny._column_safety(c, 'files', cols='*')
             shiny._column_safety(c, 'files', cols=('name', 'size', 'is_dir'))
             shiny._column_safety(c, 'files', cols=('directory', 'mod_time', 'is_dir', 'is_dir', 'size'))
-            with self.assertRaises(sqlite3.OperationalError):
+            with self.assertRaises(OperationalError):
                 shiny._column_safety(c, 'files', cols=('name', 'directory', 'isdir', 'size'))
-            with self.assertRaises(sqlite3.OperationalError):
+            with self.assertRaises(OperationalError):
                 shiny._column_safety(c, 'files', cols=('dog', 'name', 'is_dir'))
 
     def test_tag_pragma(self):
@@ -58,9 +25,9 @@ class DBIntegrity(DBTester):
             shiny._column_safety(c, 'tags', cols='*')
             shiny._column_safety(c, 'tags', cols=('key', 'value'))
             shiny._column_safety(c, 'tags', cols=('value', 'id', 'id'))
-            with self.assertRaises(sqlite3.OperationalError):
+            with self.assertRaises(OperationalError):
                 shiny._column_safety(c, 'tags', cols=('valkey',))
-            with self.assertRaises(sqlite3.OperationalError):
+            with self.assertRaises(OperationalError):
                 shiny._column_safety(c, 'tags', cols=('value', 'id', 'ke'))
 
 

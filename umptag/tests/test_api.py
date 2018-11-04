@@ -1,4 +1,4 @@
-from test import DBTester
+from . import DBTester
 import shiny, tags, api
 import unittest
 
