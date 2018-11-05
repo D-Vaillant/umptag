@@ -8,16 +8,13 @@ def load(suite, name):
 
 def suite():
     suite = unittest.TestSuite()
+
     load(suite, 'umptag.tests.test_tags')
     load(suite, 'umptag.tests.test_files')
     load(suite, 'umptag.tests.test_filetag')
-    """
-    load(suite, 'test_api')
-    load(suite, 'test_filesystem')
-    """
-    # This causes relative import issues.
-    # Ah, python importing. My nemesis.
-    # return unittest.defaultTestLoader.discover('umptag/tests')
+    load(suite, 'umptag.tests.test_api')
+    # load(suite, 'test_filesystem') # This causes relative import issues.  # Ah, python importing. My nemesis.
+    # return unittest.defaultTestLoader.discover('./umptag/tests')
     return suite
 
 

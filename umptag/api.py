@@ -1,4 +1,4 @@
-import shiny, tags
+from . import shiny, tags
 
 def find_database():
     """ Returns a filepath that points to the database.
