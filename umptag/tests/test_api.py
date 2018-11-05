@@ -45,7 +45,7 @@ class APITester(DBTester):
         # Make hierarchy with two dirs.
         # Put the database file in one.
         # Enter the other directory.
-        hier = get_random_hierarchy(
+        hier = get_random_hierarchy()
         self.assertIs(api.find_database(), None)
 
 
