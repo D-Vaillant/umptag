@@ -24,12 +24,13 @@ class FilesystemTester(DBTester):
         self.assertEqual(fs_files, fetched_files)
 
 
-class APITester(DBTester):
+class DatabaseLocTester(DBTester):
     def test_find_database(self):
         struct = [(2, randint(2, 4)),
                   (lambda: randint(2, 3), 3),
                   (4, lambda: randint(1, 3))]
         hier = get_random_hierarchy(struct)
+        self.make_hierarchy(hier)
         db_loc = '.umptag.db'
         self.fs.create_file(db_loc)
         # Randomly enter a child directory.
@@ -42,10 +43,27 @@ class APITester(DBTester):
         self.assertEquals(db_loc, api.find_database())
 
     def test_find_database_none(self):
-        # Make hierarchy with two dirs.
-        # Put the database file in one.
-        # Enter the other directory.
-        hier = get_random_hierarchy()
+        left, right = make_random_word(), make_random_word()
+        self.fs.mkdir(left)
+        self.fs.mkfile(left+os.sep+'.umptag')
+        self.fs.mkdir(right)
+        os.chdir(right)
         self.assertIs(api.find_database(), None)
 
+class TaggingTester(DBTester):
+    def setUp(self):
+        super().setUp()
+        self.filepaths = [make_random_word() for _ in range(randint(3, 6))]
+        for fp in self.filepaths:
+            self.fs.mkfile(fp)
+        self.dirpaths = {make_random_word():list() for _ in range(randint(2, 4))}
+        for dp in self.dirpaths:
+            self.fs.mkdir(dp)
+            for _ in range(randint(0, 2)):
+                stem = make_random_word()
+                self.fs.mkfile(dp+os.sep+stem)
+                self.dirpaths[dp].append(stem)
+
+    def test_apply_tag(self):
+        pass
 

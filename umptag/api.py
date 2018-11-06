@@ -6,12 +6,12 @@ def find_database():
     raise NotImplementedError
 
 
-def apply_tag(filepath, *args, **kwargs):
-    """ Adds each tag and key=value tag to the given filepath. """
+def apply_tag(target, *args, **kwargs):
+    """ Adds each tag and key=value tag to the given target. """
     raise NotImplementedError
 
-def remove_tag(filepath, *args, **kwargs):
-    """ Removes each tag and key=value tag from the given filepath. """
+def remove_tag(target, *args, **kwargs):
+    """ Removes each tag and key=value tag from the given target. """
     raise NotImplementedError
 
 def merge_tag(primary, secondary):
@@ -19,13 +19,13 @@ def merge_tag(primary, secondary):
     raise NotImplementedError
 
 
-def show_tags(filepath):
-    """ Lists the tags applied to filepath. """
+def show_tags(target):
+    """ Lists the tags applied to target. """
     raise NotImplementedError
 
 
-def show_files(*args, **kwargs):
-    """ Lists the files with all of the applied tags. """
+def show_targets(*args, **kwargs):
+    """ Lists the targets with all of the applied tags. """
     raise NotImplementedError
 
 
