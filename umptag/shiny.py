@@ -84,6 +84,15 @@ def initialize_tables(c, destructive=True):
     #with open(schema, 'r') as sch:
     c.executescript(schema)
 
+def initialize_connection(db_loc, new_db=False):
+    conn = sqlite3.connect(db_loc,
+            detect_types=sqlite3.PARSE_DECLTYPES)
+    sqlite3.register_adapter(bool, int)
+    sqlite3.register_converter("boolean", lambda v: bool(int(v)))
+    if new_db:
+        initialize_tables(conn)
+    return conn
+
 my_tables = ['files', 'tags']
 
 def _column_safety(c, table, cols='*'):
