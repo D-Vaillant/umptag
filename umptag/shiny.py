@@ -7,7 +7,6 @@ import os, os.path
 # Schema
 ## TODO: Set it up so I can read this from a file.
 schema = """
-DROP TABLE IF EXISTS files;
 CREATE TABLE files (
     id integer PRIMARY KEY,
     directory text NOT NULL,
@@ -18,7 +17,6 @@ CREATE TABLE files (
     CONSTRAINT path UNIQUE (directory, name)
 );
 
-DROP TABLE IF EXISTS tags;
 CREATE TABLE tags (
     id integer PRIMARY KEY,
     key text DEFAULT '' NOT NULL,
@@ -26,7 +24,6 @@ CREATE TABLE tags (
     CONSTRAINT tag_pk UNIQUE (key, value)
 );
 
-DROP TABLE IF EXISTS filetag_junction;
 CREATE TABLE filetag_junction (
     file_id int, tag_id int,
     CONSTRAINT file_tag_pk PRIMARY KEY (file_id, tag_id),
@@ -178,9 +175,12 @@ def tags_of_file(c, path, cols=('key', 'value')):
             INNER JOIN files ON files.id = J.file_id
             WHERE files.directory = ? AND files.name = ?""",
             os.path.split(path))
+    # res = [(r[1] if r[0] == '' else r) for r in res.fetchall()]
     return res.fetchall()
 
-def files_of_tag(c, key, value, cols=('directory', 'name')):
+def files_of_tag(c, key='', value=None, cols=('directory', 'name')):
+    if value is None and key != '':
+        key, value = '', key
     res = c.execute(f"""SELECT {', '.join(cols)} FROM filetag_junction J
             INNER JOIN files on files.id = J.file_id
             INNER JOIN tags ON tags.id = J.tag_id
@@ -189,11 +189,13 @@ def files_of_tag(c, key, value, cols=('directory', 'name')):
     return res.fetchall()
 
 # Actual usage!
-def tag_file(c, path, key="", value=""):
-    filepath = os.path.join(_get_or_add_file(c, path))
-    tags.add_tag(c, key, value)
+def tag_file(c, path, key="", value=None):
+    if value is None and key != '':
+        key, value = '', key
+    filepath = os.path.join(*_get_or_add_file(c, path))
+    tags.get_or_add_tag(c, key, value)
     try:
-        relate_tag_and_file(filepath, key, value)
+        relate_tag_and_file(c, filepath, key, value)
     except sqlite3.IntegrityError:
         logging.info("Tried to add duplicate tag.")
 

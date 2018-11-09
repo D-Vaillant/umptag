@@ -7,7 +7,10 @@ from pyfakefs.fake_filesystem_unittest import TestCase, Patcher
 from . import DBTester
 from .utilities import make_random_word, get_random_hierarchy
 from .. import shiny, tags, api, files
+from pathlib import Path
 
+
+"""
 class FilesystemTester(DBTester):
     def test_collect_files_flat(self):
         hier = get_random_hierarchy(structure=[(lambda: randint(2, 6), 0)])
@@ -25,9 +28,26 @@ class FilesystemTester(DBTester):
         fs_files = sorted(hier[0]+hier[1])  # Store those in here.
         fetched_files = sorted(files.collect_files())
         self.assertEqual(fs_files, fetched_files)
+"""
+
+class RealFS_DBTester(unittest.TestCase):
+    def setUp(self):
+        #self.tmp_directory = os.path.abspath('.ump_tmp')
+        self.start = os.getcwd()
+        self.tmpdir = '.ump_tmp'
+        try:
+            os.mkdir(self.tmpdir)
+        except FileExistsError:
+            # self.tearDown()
+            unittest.skip("Folder already existed; tearing down and skipping.")
+        os.chdir(self.tmpdir)
+
+    def tearDown(self):
+        os.chdir(self.start)
+        rmtree(self.tmpdir)
 
 
-class DatabaseLocTester(DBTester):
+class FindDatabaseTester(DBTester):
     def test_find_database_filepath(self):
         struct = [(2, randint(2, 4)),
                   (lambda: randint(2, 3), 3),
@@ -61,18 +81,7 @@ class DatabaseLocTester(DBTester):
         self.assertIs(api.find_database_filepath(api.DEFAULT_DB_NAME), None)
 
 
-class InitializationTester(unittest.TestCase):
-    def setUp(self):
-        #self.tmp_directory = os.path.abspath('.ump_tmp')
-        self.start = os.getcwd()
-        self.tmpdir = '.ump_tmp'
-        try:
-            os.mkdir(self.tmpdir)
-        except FileExistsError:
-            # self.tearDown()
-            unittest.skip("Folder already existed; tearing down and skipping.")
-        os.chdir(self.tmpdir)
-
+class FetchConnectionTester(RealFS_DBTester):
     def test_new_tables(self):
         pass
 
@@ -97,26 +106,91 @@ class InitializationTester(unittest.TestCase):
     def test_get_conn_altname(self):
         c = api.get_conn('foobar')
 
-    def tearDown(self):
-        os.chdir(self.start)
-        rmtree(self.tmpdir)
+    def test_database_cognancy(self):
+        # Setup the database.
+        with api.get_conn() as c:
+            c.execute("CREATE TABLE foo ("
+                    "id integer PRIMARY KEY,"
+                    "second_id integer,"
+                    "bar TEXT)")
+        # Set up the function to wrap.
+        def test_me(conn):
+            conn.execute("INSERT INTO foo (id, second_id, bar) VALUES (1, ?, ?)", (5, "moo"))
+        api.database_cognant(test_me)()  # Run the wrapped function.
+        with self.subTest():
+            outcoming = api.get_conn().execute("SELECT * FROM foo WHERE bar = ?", ("moo",))
+            self.assertIsNotNone(outcoming.fetchone())
+        with self.subTest():
+            outcoming = api.get_conn().execute("SELECT * FROM foo WHERE bar = ?", ("geez",))
+            self.assertIsNone(outcoming.fetchone())
 
 
-class TaggingTester(TestCase):
+class TagChangeTester(RealFS_DBTester):
+    """ Tests `apply_tag` and `remove_tag`. """
     def setUp(self):
-        self.setUpPyfakefs()
+        """ What we have available:
+        self.filepaths: A list of the files. May or may not be top-level.
+        self.dirpaths: A list of the directories. All top-level.
+        """
+        super().setUp()
         self.filepaths = [make_random_word() for _ in range(randint(3, 6))]
         for fp in self.filepaths:
-            self.fs.create_file(fp)
-        self.dirpaths = {make_random_word():list() for _ in range(randint(2, 4))}
+            # I just used pathlib here. Dang. Oh well.
+            Path(fp).touch()
+            # self.fs.create_file(fp)
+        self.dirpaths = [make_random_word() for _ in range(randint(2, 4))]
         for dp in self.dirpaths:
-            self.fs.create_dir(dp)
+            Path(dp).mkdir(exist_ok=False)
+            # self.fs.create_dir(dp)
             for _ in range(randint(0, 2)):
                 stem = make_random_word()
-                self.fs.create_file(dp+os.sep+stem)
-                self.dirpaths[dp].append(stem)
+                p = Path(dp, stem)
+                p.touch()
+                self.filepaths.append(str(p))
+                # Path(dp, stem).touch()
+                # self.fs.create_file(dp+os.sep+stem)
+                # self.dirpaths[dp].append(stem)
 
-    def test_apply_tag(self):
-        pass
+    def test_simple_apply_tag(self):
+        api.initialize_conn()
+        fp = self.filepaths[0]
+        tg = make_random_word()
+        api.apply_tag(fp, tg)
+        with self.subTest(fp=fp, tg=tg):
+            with api.get_conn() as c:
+                out = shiny.tags_of_file(c, fp)
+            self.assertEqual(out[0], ('', tg))
+        with self.subTest(fp=fp, tg=tg):
+            with api.get_conn() as c:
+                out = shiny.files_of_tag(c, tg)
+            self.assertEqual(os.path.join(*out[0]), fp)
 
 
+    def test_apply_keyless_tag_to_files(self):
+        # Choose some random files to tag.
+        api.initialize_conn()
+        gen_tags = {}
+        len_fp = len(self.filepaths)
+        # We create a random number of tags and then apply it to a random
+        # number of files. We note which files that the tag was applied to.
+        for namelen in range(3, randint(4, 10)):  # Avoid duplicates by various lengths.
+            random_tag = make_random_word(a=namelen, b=namelen)
+            gen_tags[random_tag] = []
+            # Avoid duplicates by using a set.
+            chosen = set(choice(self.filepaths) for _ in range(randint(2, len_fp-2)))
+            for chose in chosen:
+                api.apply_tag(chose, random_tag)
+                gen_tags[random_tag].append(chose)
+        # Now we check each tag to make sure that the appropriate files were tagged.
+        for random_tag, tagged_files in gen_tags.items():
+            with self.subTest(random_tag=random_tag, tagged_files=tagged_files):
+                tagged_files = set(tagged_files)  # In lieu of sorting.
+                with api.get_conn() as c:
+                    fetched_files = shiny.files_of_tag(c, '', random_tag)
+                    fetched_files = set(str(Path(*ff)) for ff in fetched_files)
+                """
+                print(random_tag)
+                print(tagged_files)
+                print(fetched_files)
+                """
+                self.assertEqual(tagged_files, fetched_files)

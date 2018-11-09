@@ -8,8 +8,8 @@ import string
 chars = string.ascii_letters + string.digits
 
 
-def make_random_word():
-    return ''.join([choice(chars) for _ in range(randint(4, 8))])
+def make_random_word(a=4, b=8):
+    return ''.join([choice(chars) for _ in range(randint(a, b))])
 
 
 def get_random_hierarchy(structure=((2, 2), (lambda: randint(1, 4), 1), (3, 0))):
