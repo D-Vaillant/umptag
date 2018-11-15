@@ -93,7 +93,7 @@ class FetchConnectionTester(RealFS_DBTester):
 
     def test_get_conn(self):
         # c = api.get_conn(in_memory=True)
-        print(os.getcwd())
+        # print(os.getcwd())
         c_1 = api.get_conn()
         c_2 = api.get_conn(api.DEFAULT_DB_NAME)
         c_3 = api.get_conn(':memory:')
@@ -177,7 +177,7 @@ class TagChangeTester(RealFS_DBTester):
             random_tag = make_random_word(a=namelen, b=namelen)
             gen_tags[random_tag] = []
             # Avoid duplicates by using a set.
-            chosen = set(choice(self.filepaths) for _ in range(randint(2, len_fp-2)))
+            chosen = set(choice(self.filepaths) for _ in range(randint(1, len_fp-2)))
             for chose in chosen:
                 api.apply_tag(chose, random_tag)
                 gen_tags[random_tag].append(chose)

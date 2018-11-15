@@ -1,3 +1,4 @@
+from typing import Union
 from datetime import datetime
 from . import tags
 import sqlite3
@@ -33,6 +34,29 @@ CREATE TABLE filetag_junction (
     FOREIGN KEY (tag_id) REFERENCES tags (id)
 );"""
 
+# Initializing the tables and the connection to the database.
+def initialize_tables(c, destructive=True):
+    """ Creates a new database, wiping out the previous one if needed. 
+    c :: Cursor. """
+    if destructive:
+        c.executescript(';\n'.join(
+                "DROP TABLE IF EXISTS %s" % table for table in
+                ('files', 'tags', 'filetag_junction'))
+                )
+    #with open(schema, 'r') as sch:
+    c.executescript(schema)
+
+def initialize_connection(db_loc, new_db=False):
+    conn = sqlite3.connect(db_loc,
+            detect_types=sqlite3.PARSE_DECLTYPES)
+    sqlite3.register_adapter(bool, int)
+    sqlite3.register_converter("boolean", lambda v: bool(int(v)))
+    if new_db:
+        initialize_tables(conn)
+    return conn
+
+
+# Some safety stuff we're not really using right now.
 """ A preliminary implementation.
 Basically: we'll put all of our Cursor-aware methods into classes,
 decorated as such. We subclass those classes when we get our Connection
@@ -70,26 +94,6 @@ Maybe it would be better to have a Tag class and a ConnectedTag class.
 Or a Connected class which includes all of our public methods we can use.
 """
 
-def initialize_tables(c, destructive=True):
-    """ Creates a new database, wiping out the previous one if needed. 
-    c :: Cursor. """
-    if destructive:
-        c.executescript(';\n'.join(
-                "DROP TABLE IF EXISTS %s" % table for table in
-                ('files', 'tags', 'filetag_junction'))
-                )
-    #with open(schema, 'r') as sch:
-    c.executescript(schema)
-
-def initialize_connection(db_loc, new_db=False):
-    conn = sqlite3.connect(db_loc,
-            detect_types=sqlite3.PARSE_DECLTYPES)
-    sqlite3.register_adapter(bool, int)
-    sqlite3.register_converter("boolean", lambda v: bool(int(v)))
-    if new_db:
-        initialize_tables(conn)
-    return conn
-
 my_tables = ['files', 'tags']
 
 def _column_safety(c, table, cols='*'):
@@ -122,30 +126,35 @@ def fs(func, *args, **kwargs):
 
 
 # File functions.
-@fs
-def _get_file(c, path, cols=('directory', 'name')):
+# @fs
+def _get_file(c, directory, name, cols=('directory', 'name')) -> Union[tuple, None]:
     """ All values: ("directory", "name", "size", "mod_time", "is_dir")
     `cols` is UNSAFE. """
     # WARNING: Yeah, I'm using the string input thing.
     #   I wish I could have figured out a better way.
     return c.execute(f"""SELECT {', '.join(cols)} FROM files WHERE
-            directory = ? AND name = ?""", os.path.split(path)).fetchone()
+            directory = ? AND name = ? LIMIT 1""", (directory, name)).fetchone()
 
-def get_file(c, path):
-    return _get_file(c, path)
+def get_file(c, directory, name):
+    # TODO Take a look at what exactly I'm intending here.
+    """ Returns (path,). Weird. """
+    return _get_file(c, directory, name, cols=('directory', 'name'))
 
-def get_file_id(c, path):
-    """ Shortcut method. """
-    return _get_file(c, path, cols=('id',))[0]
+def get_file_id(c, directory, name) -> Union[int, None]:
+    """ Returns the id of the file corresponding to the path. """
+    try:
+        return _get_file(c, directory, name, cols=('id',))[0]
+    except IndexError:
+        return None
 
-def _get_file_from_id(c, id, cols=('directory', 'name')):
+def _get_file_from_id(c, id_, cols=('directory', 'name')):
     return c.execute(f"""SELECT {', '.join(cols)} FROM files WHERE
-            id = ?""", (id,)).fetchone()
+            id = ?""", (id_,)).fetchone()
 
-def add_file(c, path):
-    """ Adds a file. Raises an exception if it already exists.
+def add_file(c, directory, name):
+    """ Adds a file. Raises an IntegrityError if it already exists.
     c :: Cursor. """
-    directory, name = os.path.split(path)
+    path = os.path.join(directory, name)
     size = round(os.stat(path).st_size, 6)
     mod_time = datetime.fromtimestamp(os.stat(path).st_mtime)
     is_dir = os.path.isdir(path)
@@ -154,12 +163,13 @@ def add_file(c, path):
               (directory, name, size, mod_time, is_dir))
     return
 
-def _get_or_add_file(c, path, **kw):
+def get_or_add_file(c, directory, name, **kw) -> Union[tuple, None]:
     try:
-        add_file(c, path)
+        add_file(c, directory, name)
     except sqlite3.IntegrityError:
         pass
-    return _get_file(c, path)
+    return get_file(c, directory, name)
+    #return c.execute("SELECT directory, name FROM files WHERE directory = ? AND name = ? LIMIT 1").fetchone()
 
 # Tag functions.
 # filetag_junction functions.
@@ -190,9 +200,10 @@ def files_of_tag(c, key='', value=None, cols=('directory', 'name')):
 
 # Actual usage!
 def tag_file(c, path, key="", value=None):
+    d, n = os.path.split(path)
     if value is None and key != '':
         key, value = '', key
-    filepath = os.path.join(*_get_or_add_file(c, path))
+    filepath = os.path.join(*get_or_add_file(c, d, n))
     tags.get_or_add_tag(c, key, value)
     try:
         relate_tag_and_file(c, filepath, key, value)
