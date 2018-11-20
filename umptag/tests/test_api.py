@@ -6,7 +6,7 @@ from random import randint, choice
 from pyfakefs.fake_filesystem_unittest import TestCase, Patcher
 from . import DBTester
 from .utilities import make_random_word, get_random_hierarchy
-from .. import shiny, tags, api, files
+from .. import shiny, tags, api, files, database
 from pathlib import Path
 
 
@@ -70,7 +70,7 @@ class FindDatabaseTester(DBTester):
                 break
             current_dir = choice(dirs)
             os.chdir(current_dir)
-        self.assertEquals(db_file.path, api.find_database_filepath(api.DEFAULT_DB_NAME))
+        self.assertEquals(db_file.path, database.find_database_filepath(api.DEFAULT_DB_NAME))
 
     def test_find_database_none(self):
         left, right = make_random_word(), make_random_word()
@@ -78,7 +78,7 @@ class FindDatabaseTester(DBTester):
         self.fs.create_file(left+os.sep+api.DEFAULT_DB_NAME)
         self.fs.create_dir(right)
         os.chdir(right)
-        self.assertIs(api.find_database_filepath(api.DEFAULT_DB_NAME), None)
+        self.assertIs(database.find_database_filepath(api.DEFAULT_DB_NAME), None)
 
 
 class FetchConnectionTester(RealFS_DBTester):
@@ -87,8 +87,8 @@ class FetchConnectionTester(RealFS_DBTester):
 
     def test_init_connection(self):
         pass
-        shiny.initialize_connection(':memory:', new_db=True)
-        shiny.initialize_connection('.umptag.db', new_db=True)
+        database.initialize_connection(':memory:', new_db=True)
+        database.initialize_connection('.umptag.db', new_db=True)
         # Test some properties of the connection.
 
     def test_get_conn(self):

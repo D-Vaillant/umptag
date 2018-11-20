@@ -2,7 +2,7 @@ import sqlite3
 import unittest
 import logging
 from pyfakefs.fake_filesystem_unittest import TestCase
-from .. import shiny
+from .. import shiny, database
 
 
 format_ = "%(levelname)s :: %(funcName)s -> %(message)s"
@@ -18,7 +18,7 @@ class DBTester(TestCase):
         # self.conn.row_factory = sqlite3.Row
         sqlite3.register_adapter(bool, int)
         sqlite3.register_converter("boolean", lambda v: bool(int(v)))
-        shiny.initialize_tables(self.conn.cursor())
+        database._initialize_tables(self.conn.cursor())
 
     def tearDown(self):
         self.conn.close()
