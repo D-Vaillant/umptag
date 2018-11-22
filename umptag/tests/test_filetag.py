@@ -60,19 +60,19 @@ class TestFiletagJunctionFunctions(JunctionTester):
             logging.debug("Adding %s to the database.", fp)
             with self.conn as c:
                 d, n = os.path.split(fp)
-                shiny.add_file(c, d, n)
+                shiny._add_file(c, d, n)
                 for pair in self.pairs:  # For each tag, we go through.
                     # with self.subTest(pair=pair):
                     logging.debug("Using pair <%s=%s>.", (*pair))
                     tags.get_or_add_tag(c, *pair)  # Adding the tag.
                     # We check that it works by getting the ids directly.
-                    file_id = shiny.get_file_id(c, d, n)
+                    file_id = shiny._get_file_id(c, d, n)
                     tag_id = c.execute("SELECT id FROM tags WHERE key=? AND value=?", pair).fetchone()[0]
                     # tag_id = tags.tag_kv_to_id(c, *pair)
                     logging.debug("Checking if the database has the pair "
                                   "(file_id=%d, tag_id=%d)." % (file_id, tag_id))
                     # Setting up the relation. 
-                    shiny.relate_tag_and_file(c, fp, *pair)
+                    shiny._relate_tag_and_file(c, d, n, *pair)
                     # Finally, we check if only one row was created in the junction table.
                     res = c.execute("""SELECT * FROM filetag_junction WHERE
                             file_id = ? AND tag_id = ?""", (file_id, tag_id)).fetchall()
@@ -84,13 +84,13 @@ class TestFiletagJunctionFunctions(JunctionTester):
             for fp in self.fake_filepaths:
                 seen = []  # We keep track of each tag that we've added.
                 logging.debug("Our fake_filepath is %s.", fp)
-                shiny.add_file(c, *os.path.split(fp))
+                shiny._add_file(c, *os.path.split(fp))
                 for pair in self.pairs:
                     with self.subTest(fp=fp, pair=pair):
                         tags.get_or_add_tag(c, *pair)
                         seen.append(pair)  # Keeping track...
                         logging.debug("Tags we've seen: {}.".format(', '.join('='.join(_) for _ in seen)))
-                        shiny.relate_tag_and_file(c, fp, *pair)  # Relating...
+                        shiny._relate_tag_and_file(c, *os.path.split(fp), *pair)  # Relating...
                         # Here we get all of the tags in the standard format.
                         filetags = shiny.tags_of_file(c, fp, cols=('key', 'value'))
                         logging.debug("Tags we got back: {}.".format(', '.join('='.join(_) for _ in filetags)))
@@ -105,10 +105,10 @@ class TestFiletagJunctionFunctions(JunctionTester):
                 logging.debug("Our fake_filepath is %s.", fp)
                 with self.subTest(fp=fp):
                     d, n = os.path.split(fp)
-                    shiny.add_file(c, d, n)
+                    shiny._add_file(c, d, n)
                     seen.append(os.path.split(fp))
                     logging.debug("Files we've seen: {}.".format(', '.join('='.join(_) for _ in seen)))
-                    shiny.relate_tag_and_file(c, fp, *tag)
+                    shiny._relate_tag_and_file(c, d, n, *tag)
                     tagfiles = shiny.files_of_tag(c, *tag, cols=('directory', 'name'))
                     logging.debug("Files we got back: {}.".format(', '.join('='.join(_) for _ in tagfiles)))
                     self.assertEqual(sorted(seen), sorted(tagfiles))

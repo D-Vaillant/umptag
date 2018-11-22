@@ -79,7 +79,7 @@ def fs(func, *args, **kwargs):
 
 # File functions.
 # @fs
-def _get_file(c, directory, name, cols=('directory', 'name')) -> Union[tuple, None]:
+def _get_file_properties(c, directory, name, cols=('directory', 'name')) -> Union[tuple, None]:
     """ All values: ("directory", "name", "size", "mod_time", "is_dir")
     `cols` is UNSAFE. """
     # WARNING: Yeah, I'm using the string input thing.
@@ -87,15 +87,16 @@ def _get_file(c, directory, name, cols=('directory', 'name')) -> Union[tuple, No
     return c.execute(f"""SELECT {', '.join(cols)} FROM files WHERE
             directory = ? AND name = ? LIMIT 1""", (directory, name)).fetchone()
 
-def get_file(c, directory, name):
+def _get_file(c, directory, name):
     # TODO Take a look at what exactly I'm intending here.
-    """ Returns (path,). Weird. """
-    return _get_file(c, directory, name, cols=('directory', 'name'))
+    """ Returns (path,). Weird.
+    Can be replaced with a _file_exists thing. """
+    return _get_file_properties(c, directory, name, cols=('directory', 'name'))
 
-def get_file_id(c, directory, name) -> Union[int, None]:
+def _get_file_id(c, directory, name) -> Union[int, None]:
     """ Returns the id of the file corresponding to the path. """
     try:
-        return _get_file(c, directory, name, cols=('id',))[0]
+        return _get_file_properties(c, directory, name, cols=('id',))[0]
     except IndexError:
         return None
 
@@ -103,7 +104,7 @@ def _get_file_from_id(c, id_, cols=('directory', 'name')):
     return c.execute(f"""SELECT {', '.join(cols)} FROM files WHERE
             id = ?""", (id_,)).fetchone()
 
-def add_file(c, directory, name):
+def _add_file(c, directory, name):
     """ Adds a file. Raises an IntegrityError if it already exists.
     c :: Cursor. """
     path = os.path.join(directory, name)
@@ -115,22 +116,26 @@ def add_file(c, directory, name):
               (directory, name, size, mod_time, is_dir))
     return
 
-def get_or_add_file(c, directory, name, **kw) -> Union[tuple, None]:
+def _get_or_add_file(c, directory, name, **kw) -> Union[tuple, None]:
     try:
-        add_file(c, directory, name)
+        _add_file(c, directory, name)
     except sqlite3.IntegrityError:
         pass
-    return get_file(c, directory, name)
+    return _get_file(c, directory, name)
     #return c.execute("SELECT directory, name FROM files WHERE directory = ? AND name = ? LIMIT 1").fetchone()
 
 # Tag functions.
 # filetag_junction functions.
-def relate_tag_and_file(c, path, key, value):
+def _relate_tag_and_file(c, directory, name, key, value):
+    """ We don't check, here, to make sure that what we're plugging in is
+    actually in the database. """
     c.execute("""INSERT INTO filetag_junction (file_id, tag_id) SELECT
             (SELECT id FROM files WHERE directory = ? AND name = ?) AS file_id,
             (SELECT id FROM tags WHERE key = ? AND value = ?) AS tag_id""",
-            (*os.path.split(path), key, value))
+            (directory, name, key, value))
 
+
+# Public methods.
 def tags_of_file(c, path, cols=('key', 'value')):
     res = c.execute(f"""SELECT {', '.join(cols)} FROM filetag_junction J
             INNER JOIN tags ON tags.id = J.tag_id
@@ -151,16 +156,18 @@ def files_of_tag(c, key='', value=None, cols=('directory', 'name')):
     return res.fetchall()
 
 # Actual usage!
-def tag_file(c, path, key="", value=None):
-    d, n = os.path.split(path)
+def tag_file(c, filepath, key="", value=None):
     if value is None and key != '':
         key, value = '', key
-    filepath = os.path.join(*get_or_add_file(c, d, n))
+    directory, name = os.path.split(filepath)
+    _get_or_add_file(c, directory, name)
     tags.get_or_add_tag(c, key, value)
     try:
-        relate_tag_and_file(c, filepath, key, value)
+        _relate_tag_and_file(c, directory, name, key, value)
     except sqlite3.IntegrityError:
-        logging.info("Tried to add duplicate tag.")
+        logging.warning("Tried to tag %s with %s, a duplicate tag.",
+                os.path.join(directory, name), key+'='+value if key != '' else value)
+    return
 
 """SELECT {', '.join(('files.'+col for col in cols)} from files INNER JOIN filetag_junction ON file.id = filetag_junction.file_id WHERE filetag_junction.tag_id = N"""
 """SELECT files.id, files.filepath from (INNER JOIN on tags.id = junction.tag_id, INNER JOIN filesfONiles"""

@@ -38,23 +38,21 @@ def database_cognant(func, *args):
     """ Use with a function that takes an sqlite connection
     as the first argument. """
     # print("No database detected. Run `umptag init` first.")
-    def out_func(*args):
+    def out_func(*args, **kwargs):
         with get_conn(fail_if_uninitialized=True) as conn:
-            out = func(conn, *args)
+            out = func(conn, *args, **kwargs)
         return out
     return out_func
 
 
 @database_cognant
-def apply_tag(conn, target, *args, **kwargs):
-    """ Adds each tag and key=value tag to the given target. """
-    for value in args:
-        shiny.tag_file(conn, target, value)
-        # shiny.relate_tag_and_file(conn, target, '', arg)
-    for key, value in kwargs.items():
-        shiny.tag_file(conn, target, key, value)
-        # shiny.relate_tag_and_file(conn, target, key, value)
-
+def apply_tag(conn, target, key='', value=None):
+    # Why did I implement it this way? This seems stupid.
+    # I'll just make it how I did add_tag.
+    if value is None and key != '':
+        key, value = '', key
+    shiny.tag_file(conn, target, key, value)
+    return
 
 @database_cognant
 def remove_tag(conn, target, *args, **kwargs):

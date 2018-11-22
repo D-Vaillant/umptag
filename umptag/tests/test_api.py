@@ -1,3 +1,4 @@
+import logging
 import os, os.path
 from shutil import rmtree
 import unittest
@@ -86,7 +87,6 @@ class FetchConnectionTester(RealFS_DBTester):
         pass
 
     def test_init_connection(self):
-        pass
         database.initialize_connection(':memory:', new_db=True)
         database.initialize_connection('.umptag.db', new_db=True)
         # Test some properties of the connection.
@@ -150,12 +150,13 @@ class TagChangeTester(RealFS_DBTester):
                 # Path(dp, stem).touch()
                 # self.fs.create_file(dp+os.sep+stem)
                 # self.dirpaths[dp].append(stem)
+        api.initialize_conn()
+        return
 
     def test_simple_apply_tag(self):
-        api.initialize_conn()
-        fp = self.filepaths[0]
+        fp = choice(self.filepaths)
         tg = make_random_word()
-        api.apply_tag(fp, tg)
+        api.apply_tag(fp, tg)  # TESTED FUNCTION
         with self.subTest(fp=fp, tg=tg):
             with api.get_conn() as c:
                 out = shiny.tags_of_file(c, fp)
@@ -164,11 +165,11 @@ class TagChangeTester(RealFS_DBTester):
             with api.get_conn() as c:
                 out = shiny.files_of_tag(c, tg)
             self.assertEqual(os.path.join(*out[0]), fp)
-
+        return  # Because otherwise we'll get LOST
 
     def test_apply_keyless_tag_to_files(self):
+        DEBUG = True
         # Choose some random files to tag.
-        api.initialize_conn()
         gen_tags = {}
         len_fp = len(self.filepaths)
         # We create a random number of tags and then apply it to a random
@@ -179,7 +180,7 @@ class TagChangeTester(RealFS_DBTester):
             # Avoid duplicates by using a set.
             chosen = set(choice(self.filepaths) for _ in range(randint(1, len_fp-2)))
             for chose in chosen:
-                api.apply_tag(chose, random_tag)
+                api.apply_tag(chose, random_tag)  # TESTED FUNCTION
                 gen_tags[random_tag].append(chose)
         # Now we check each tag to make sure that the appropriate files were tagged.
         for random_tag, tagged_files in gen_tags.items():
@@ -188,9 +189,41 @@ class TagChangeTester(RealFS_DBTester):
                 with api.get_conn() as c:
                     fetched_files = shiny.files_of_tag(c, '', random_tag)
                     fetched_files = set(str(Path(*ff)) for ff in fetched_files)
-                """
-                print(random_tag)
-                print(tagged_files)
-                print(fetched_files)
-                """
+                if DEBUG:
+                    logging.info("Random tag was %s.", random_tag)
+                    logging.info("Tagged files were: %s", ', '.join(tagged_files))
+                    logging.info("Fetched files were: %s", ', '.join(fetched_files))
                 self.assertEqual(tagged_files, fetched_files)
+        return
+
+    def test_apply_keyed_tag_to_files(self):
+        """ Same as the above test, except we're using key,value tags. """
+        DEBUG = True
+        # Choose some random files to tag.
+        gen_tags = {}
+        len_fp = len(self.filepaths)
+        # We create a random number of tags and then apply it to a random
+        # number of files. We note which files that the tag was applied to.
+        for namelen in range(3, randint(4, 10)):  # Avoid duplicates by various lengths.
+            random_key = make_random_word(a=namelen, b=namelen)
+            random_tag = make_random_word(a=namelen, b=namelen)
+            gen_tags[(random_key, random_tag)] = []
+            # Avoid duplicates by using a set. Choose between 1 and almost-all of the files.
+            chosen = set(choice(self.filepaths) for _ in range(randint(1, len_fp-2)))
+            for chose in chosen:
+                api.apply_tag(chose, random_key, random_tag)  # TESTED FUNCTION
+                gen_tags[(random_key, random_tag)].append(chose)
+        # Now we check each tag to make sure that the appropriate files were tagged.
+        for (rk, rt), tagged_files in gen_tags.items():
+            with self.subTest(key=rk, tag=rt, tagged_files=tagged_files):
+                tagged_files = set(tagged_files)  # In lieu of sorting.
+                with api.get_conn() as c:
+                    fetched_files = shiny.files_of_tag(c, rk, rt)
+                    fetched_files = set(str(Path(*ff)) for ff in fetched_files)
+                if DEBUG:
+                    logging.info("Random key+tag were %s=%s.", rk, rt)
+                    logging.info("Tagged files were: %s", ', '.join(tagged_files))
+                    logging.info("Fetched files were: %s", ', '.join(fetched_files))
+                self.assertEqual(tagged_files, fetched_files)
+        return
+

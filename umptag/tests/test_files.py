@@ -40,7 +40,7 @@ class TestFileFunctions(DBTester):
                 file.st_mtime = rand_time
                 rand_time = datetime.fromtimestamp(rand_time)
                 # And then we add it and do a variety of tests
-                shiny.add_file(c, d, n)
+                shiny._add_file(c, d, n)
                 # We use this to permute.
                 all_cols = {"directory": d, "name": n, "mod_time": rand_time,
                         "size": rand_size, "is_dir": os.path.isdir(fp)}
@@ -53,13 +53,13 @@ class TestFileFunctions(DBTester):
                     with self.subTest(var=var):
                         self.assertEqual(
                             tuple(all_cols.get(k) for k in var),
-                            shiny._get_file(self.conn.cursor(),
+                            shiny._get_file_properties(self.conn.cursor(),
                                             d, n, cols=var)
                             )
 
     def test_get_safety(self):
         with self.assertRaises(OperationalError):
-            shiny._get_file(self.conn, '', 'foo', cols=('ashdoaho', 'name'))
+            shiny._get_file_properties(self.conn, '', 'foo', cols=('ashdoaho', 'name'))
 
     # Test `_get_file_from_id`.
     def test_get_file_from_id(self):
@@ -71,7 +71,7 @@ class TestFileFunctions(DBTester):
         for fp in self.fake_filepaths:
             d, n = os.path.split(fp)
             added.append((d, n))
-            shiny.add_file(self.conn, d, n)
+            shiny._add_file(self.conn, d, n)
             from_db = self.conn.execute("SELECT directory, name FROM files").fetchall()
             self.assertEqual(sorted(added), sorted(from_db))
             all_keys = self.conn.execute("SELECT DISTINCT id FROM files").fetchall()
@@ -82,23 +82,23 @@ class TestFileFunctions(DBTester):
         fp = "djowiajod.txt"
         # Test adding a non-existent file.
         with self.assertRaises(FileNotFoundError):
-            shiny.add_file(self.conn.cursor(), *os.path.split(fp))
+            shiny._add_file(self.conn.cursor(), *os.path.split(fp))
 
     def test_only_one_file_added(self):
         for fp in (self.fake_filepath, self.fake_dirpath):
             d, n = os.path.split(fp)
             c = self.conn.cursor()
-            shiny.add_file(c, d, n)
+            shiny._add_file(c, d, n)
             with self.assertRaises(IntegrityError):
-                shiny.add_file(c, d, n)
+                shiny._add_file(c, d, n)
 
     def test_adding_duplicate_exception(self):
         for fp in (self.fake_filepath, self.fake_dirpath):
             d, n = os.path.split(fp)
             c = self.conn.cursor()
-            shiny.add_file(c, d, n)
+            shiny._add_file(c, d, n)
             with self.assertRaises(IntegrityError):
-                shiny.add_file(c, d, n)
+                shiny._add_file(c, d, n)
 
     def test_correct_metadata(self):
         for (fp, file) in ((self.fake_filepath, self.fake_file), (self.fake_dirpath, self.fake_dir)):
@@ -111,7 +111,7 @@ class TestFileFunctions(DBTester):
                 rand_time = round(uniform(1 * (6**8), 1 * (9**10)), 4)
                 file.st_mtime = rand_time
                 rand_time = datetime.fromtimestamp(rand_time)
-                shiny.add_file(self.conn.cursor(), d, n)
+                shiny._add_file(self.conn.cursor(), d, n)
                 results = self.conn.cursor().execute(
                         "SELECT mod_time, size, is_dir FROM files WHERE directory = ? AND name = ?",
                         (d, n)).fetchone()
@@ -124,7 +124,7 @@ class TestFileFunctions(DBTester):
             with self.subTest(fp=fp):
                 c = self.conn.cursor()
                 d, n = os.path.split(fp)
-                got = shiny.get_or_add_file(self.conn.cursor(), d, n)
+                got = shiny._get_or_add_file(self.conn.cursor(), d, n)
                 # Getting the directory and name. Fragile.
                 got = got[0:2]
                 c = self.conn.cursor()
@@ -140,9 +140,9 @@ class TestFileFunctions(DBTester):
             with self.subTest(fp=fp):
                 d, n = os.path.split(fp)
                 c = self.conn.cursor()
-                shiny.add_file(c, d, n)
+                shiny._add_file(c, d, n)
                 # Getting the directory and name. Fragile.
-                got = shiny.get_or_add_file(c, d, n)[0:2]
+                got = shiny._get_or_add_file(c, d, n)[0:2]
                 self.assertEqual(got, c.execute(
                     """SELECT directory, name FROM files WHERE
                     directory = ? AND
