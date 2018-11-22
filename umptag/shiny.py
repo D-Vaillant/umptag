@@ -1,6 +1,7 @@
 from typing import Union
 from datetime import datetime
 from . import tags
+import sys
 import sqlite3
 import logging
 import os, os.path
@@ -101,6 +102,11 @@ def _relate_tag_and_file(c, directory, name, key, value):
             (SELECT id FROM tags WHERE key = ? AND value = ?) AS tag_id""",
             (directory, name, key, value))
 
+def _unrelate_tag_and_file(c, directory, name, key, value):
+    c.execute("""DELETE FROM filetag_junction WHERE
+        file_id=(SELECT id FROM files WHERE directory = ? AND name = ?) AND
+        tag_id=(SELECT id FROM tags WHERE key = ? AND value = ?)""",
+        (directory, name, key, value))
 
 # Possibly public.
 def _get_file(c, directory, name):
@@ -127,6 +133,10 @@ def _add_file(c, directory, name):
                  VALUES (?,?,?,?,?)""",
               (directory, name, size, mod_time, is_dir))
     return
+
+def _delete_file(c, directory, name):
+    cmd_str = "DELETE FROM files WHERE directory = ? AND name = ?"
+    c.execute(cmd_str, (directory, name))
 
 def _get_or_add_file(c, directory, name, **kw) -> Union[tuple, None]:
     try:
@@ -166,8 +176,7 @@ def tag_file(c, filepath, key="", value=None):
     try:
         _relate_tag_and_file(c, directory, name, key, value)
     except sqlite3.IntegrityError:
-        logging.warning("Tried to tag %s with %s, a duplicate tag.",
-                os.path.join(directory, name), key+'='+value if key != '' else value)
+        sys.exit(1)
     return
 
 """SELECT {', '.join(('files.'+col for col in cols)} from files INNER JOIN filetag_junction ON file.id = filetag_junction.file_id WHERE filetag_junction.tag_id = N"""

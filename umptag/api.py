@@ -1,6 +1,7 @@
 import sqlite3
 import functools
 import os.path
+import sys
 from . import shiny, tags
 from . import database as db
 
@@ -55,9 +56,20 @@ def apply_tag(conn, target, key='', value=None):
     return
 
 @database_cognant
-def remove_tag(conn, target, *args, **kwargs):
+def remove_tag(conn, target, key='', value=None):
     """ Removes each tag and key=value tag from the given target. """
-    raise NotImplementedError
+    if value is None and key != '':
+        key, value = '', key
+    if (key, value) not in shiny.tags_of_file(conn, target):
+        # No need!
+        sys.exit(1)
+    d, n = os.path.split(target)
+    shiny._unrelate_tag_and_file(conn, d, n, key, value)
+    if shiny.files_of_tag(conn, key, value) == []:
+        tags._delete_tag(conn, key, value)
+    if shiny.tags_of_file(conn, target) == []:
+        shiny._delete_file(conn, d, n)
+    # raise NotImplementedError
 
 
 @database_cognant

@@ -37,6 +37,9 @@ def _exists_tag(c: Cursor, key: str, value: str) -> bool:
     return (key, value) if exists else None
     """
 
+def _delete_tag(c: Cursor, key: str, value: str) -> bool:
+    cmd_str = "DELETE FROM tags WHERE key = ? AND value = ?"
+    c.execute(cmd_str, (key, value))
 
 def get_or_add_tag(c, key, value):
     """ If the key,value pair isn't in the database, adds it.

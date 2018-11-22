@@ -78,6 +78,11 @@ class TestFiletagJunctionFunctions(JunctionTester):
                             file_id = ? AND tag_id = ?""", (file_id, tag_id)).fetchall()
                     logging.debug("What we got from the database: {}.".format(res))
                     self.assertEqual(len(res), 1)
+                    # Now check it gets deleted properly.
+                    shiny._unrelate_tag_and_file(c, d, n, *pair)
+                    res = c.execute("""SELECT * FROM filetag_junction WHERE
+                            file_id = ? AND tag_id = ?""", (file_id, tag_id)).fetchall()
+                    self.assertEqual(len(res), 0)
 
     def test_tags_of_file(self):
         with self.conn as c:
