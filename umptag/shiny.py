@@ -87,6 +87,22 @@ def _get_file_properties(c, directory, name, cols=('directory', 'name')) -> Unio
     return c.execute(f"""SELECT {', '.join(cols)} FROM files WHERE
             directory = ? AND name = ? LIMIT 1""", (directory, name)).fetchone()
 
+def _get_file_from_id(c, id_, cols=('directory', 'name')):
+    return c.execute(f"""SELECT {', '.join(cols)} FROM files WHERE
+            id = ?""", (id_,)).fetchone()
+
+# Tag functions.
+# filetag_junction functions.
+def _relate_tag_and_file(c, directory, name, key, value):
+    """ We don't check, here, to make sure that what we're plugging in is
+    actually in the database. """
+    c.execute("""INSERT INTO filetag_junction (file_id, tag_id) SELECT
+            (SELECT id FROM files WHERE directory = ? AND name = ?) AS file_id,
+            (SELECT id FROM tags WHERE key = ? AND value = ?) AS tag_id""",
+            (directory, name, key, value))
+
+
+# Possibly public.
 def _get_file(c, directory, name):
     # TODO Take a look at what exactly I'm intending here.
     """ Returns (path,). Weird.
@@ -99,10 +115,6 @@ def _get_file_id(c, directory, name) -> Union[int, None]:
         return _get_file_properties(c, directory, name, cols=('id',))[0]
     except IndexError:
         return None
-
-def _get_file_from_id(c, id_, cols=('directory', 'name')):
-    return c.execute(f"""SELECT {', '.join(cols)} FROM files WHERE
-            id = ?""", (id_,)).fetchone()
 
 def _add_file(c, directory, name):
     """ Adds a file. Raises an IntegrityError if it already exists.
@@ -123,17 +135,6 @@ def _get_or_add_file(c, directory, name, **kw) -> Union[tuple, None]:
         pass
     return _get_file(c, directory, name)
     #return c.execute("SELECT directory, name FROM files WHERE directory = ? AND name = ? LIMIT 1").fetchone()
-
-# Tag functions.
-# filetag_junction functions.
-def _relate_tag_and_file(c, directory, name, key, value):
-    """ We don't check, here, to make sure that what we're plugging in is
-    actually in the database. """
-    c.execute("""INSERT INTO filetag_junction (file_id, tag_id) SELECT
-            (SELECT id FROM files WHERE directory = ? AND name = ?) AS file_id,
-            (SELECT id FROM tags WHERE key = ? AND value = ?) AS tag_id""",
-            (directory, name, key, value))
-
 
 # Public methods.
 def tags_of_file(c, path, cols=('key', 'value')):

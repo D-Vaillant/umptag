@@ -153,6 +153,12 @@ class TagChangeTester(RealFS_DBTester):
         api.initialize_conn()
         return
 
+
+class KeylessTagChangeTester(TagChangeTester):
+    def setUp(self):
+        super().setUp()
+        self.DEBUG = False
+
     def test_simple_apply_tag(self):
         fp = choice(self.filepaths)
         tg = make_random_word()
@@ -168,7 +174,7 @@ class TagChangeTester(RealFS_DBTester):
         return  # Because otherwise we'll get LOST
 
     def test_apply_keyless_tag_to_files(self):
-        DEBUG = True
+        DEBUG = False
         # Choose some random files to tag.
         gen_tags = {}
         len_fp = len(self.filepaths)
@@ -196,9 +202,22 @@ class TagChangeTester(RealFS_DBTester):
                 self.assertEqual(tagged_files, fetched_files)
         return
 
+    def test_simple_remove_tag(self):
+        pass
+
+    def test_remove_keyless_tag_from_files(self):
+        return
+
+class KeyedTagChangeTester(TagChangeTester):
+    def setUp(self):
+        # Move some of the logic over here
+        super().setUp()
+        pass
+
+
     def test_apply_keyed_tag_to_files(self):
         """ Same as the above test, except we're using key,value tags. """
-        DEBUG = True
+        DEBUG = False
         # Choose some random files to tag.
         gen_tags = {}
         len_fp = len(self.filepaths)
@@ -227,3 +246,5 @@ class TagChangeTester(RealFS_DBTester):
                 self.assertEqual(tagged_files, fetched_files)
         return
 
+    def test_remove_keyed_tag_from_files(self):
+        pass
