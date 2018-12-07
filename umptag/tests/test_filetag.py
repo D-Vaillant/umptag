@@ -87,17 +87,18 @@ class TestFiletagJunctionFunctions(JunctionTester):
     def test_tags_of_file(self):
         with self.conn as c:
             for fp in self.fake_filepaths:
+                d, n = os.path.split(fp)
                 seen = []  # We keep track of each tag that we've added.
                 logging.debug("Our fake_filepath is %s.", fp)
-                shiny._add_file(c, *os.path.split(fp))
+                shiny._add_file(c, d, n)
                 for pair in self.pairs:
                     with self.subTest(fp=fp, pair=pair):
                         tags.get_or_add_tag(c, *pair)
                         seen.append(pair)  # Keeping track...
                         logging.debug("Tags we've seen: {}.".format(', '.join('='.join(_) for _ in seen)))
-                        shiny._relate_tag_and_file(c, *os.path.split(fp), *pair)  # Relating...
+                        shiny._relate_tag_and_file(c, d, n, *pair)  # Relating...
                         # Here we get all of the tags in the standard format.
-                        filetags = shiny.tags_of_file(c, fp, cols=('key', 'value'))
+                        filetags = shiny.tags_of_file(c, d, n, cols=('key', 'value'))
                         logging.debug("Tags we got back: {}.".format(', '.join('='.join(_) for _ in filetags)))
                         self.assertEqual(seen, filetags)
 

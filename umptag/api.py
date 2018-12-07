@@ -46,45 +46,53 @@ def database_cognant(func, *args):
     return out_func
 
 
-@database_cognant
-def apply_tag(conn, target, key='', value=None):
-    # Why did I implement it this way? This seems stupid.
-    # I'll just make it how I did add_tag.
+def apply_tag(conn, directory, name, key='', value=None):
     if value is None and key != '':
         key, value = '', key
-    shiny.tag_file(conn, target, key, value)
-    return
+    shiny.tag_file(conn, directory, name, key, value)
+    return 0
 
-@database_cognant
-def remove_tag(conn, target, key='', value=None):
-    """ Removes each tag and key=value tag from the given target. """
+def remove_tag(conn, directory, name, key='', value=None):
+    """ Removes the tag or key=value tag from the given target. """
     if value is None and key != '':
         key, value = '', key
-    if (key, value) not in shiny.tags_of_file(conn, target):
+    if (key, value) not in shiny.tags_of_file(conn, directory, name):
         # No need!
-        sys.exit(1)
-    d, n = os.path.split(target)
-    shiny._unrelate_tag_and_file(conn, d, n, key, value)
-    if shiny.files_of_tag(conn, key, value) == []:
-        tags._delete_tag(conn, key, value)
-    if shiny.tags_of_file(conn, target) == []:
-        shiny._delete_file(conn, d, n)
-    # raise NotImplementedError
+        print("%s lacks that tag." % os.path.join(directory, name))
+        return 1
+    shiny._unrelate_tag_and_file(conn, directory, name, key, value)
+    shiny.clean_orphans(conn, directory, name, key, value)
+    return 0
 
+def remove_tags(conn, directory, name, *args, **kwargs):
+    """ Removes multiple tags from a given file. """
+    results = []
+    for arg in args:
+        results.append(remove_tag(conn, directory, name, arg))
+    for (k, v) in kwargs.items():
+        results.append(remove_tag(conn, directory, name, k, v))
+    return 1 if any(results) else 0  # Exit message 1 if any fail.
 
-@database_cognant
-def merge_tag(conn, primary, secondary):
+def merge_tag(conn, primary_key='', primary_value=None,
+                    secondary_key='', secondary_value=None):
     """ Merges the secondary tag into the primary tag. """
-    raise NotImplementedError
+    if primary_key == secondary_key and primary_value == secondary_value:
+        print("Can't merge a key with itself.")
+        return 1
+    if primary_value is None and primary_key != '':
+        primary_key, primary_value = '', primary_key
+    if secondary_value is None and secondary_key != '':
+        secondary_key, secondary_value = '', secondary_key
+    for (d, n) in shiny.files_of_tag(conn, secondary_key, secondary_value):
+        shiny.tag_file(conn, d, n, primary_key, primary_value)
+        remove_tag(conn, d, n, secondary_key, secondary_value)
 
 
-@database_cognant
-def show_tags(conn, target):
+def show_tags(conn, directory, name):
     """ Lists the tags applied to target. """
     raise NotImplementedError
 
 
-@database_cognant
 def show_targets(conn, *args, **kwargs):
     """ Lists the targets with all of the applied tags. """
     raise NotImplementedError

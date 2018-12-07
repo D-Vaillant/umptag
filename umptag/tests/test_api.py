@@ -163,58 +163,55 @@ class KeylessTagChangeTester(TagChangeTester):
         self.DEBUG = False
 
     def test_simple_apply_tag(self):
-        fp = choice(self.filepaths)
+        d, n = os.path.split(choice(self.filepaths))
         tg = make_random_word()
-        api.apply_tag(fp, tg)  # TESTED FUNCTION
-        with self.subTest(fp=fp, tg=tg):
+        with api.get_conn() as c:
+            api.apply_tag(c, d, n, tg)  # TESTED FUNCTION
+        with self.subTest(directory=d, name=d, tg=tg):
             with api.get_conn() as c:
-                out = shiny.tags_of_file(c, fp)
+                out = shiny.tags_of_file(c, d, n)
             self.assertEqual(out[0], ('', tg))
-        with self.subTest(fp=fp, tg=tg):
+        with self.subTest(directory=d, name=n, tg=tg):
             with api.get_conn() as c:
                 out = shiny.files_of_tag(c, tg)
-            self.assertEqual(os.path.join(*out[0]), fp)
+            self.assertEqual(out[0], (d, n))
         return  # Because otherwise we'll get LOST
 
     def test_apply_keyless_tag_to_files(self):
         DEBUG = False
-        # Choose some random files to tag.
-        gen_tags = {}
         len_fp = len(self.filepaths)
-        # We create a random number of tags and then apply it to a random
-        # number of files. We note which files that the tag was applied to.
-        for namelen in range(3, randint(4, 10)):  # Avoid duplicates by various lengths.
+        # Avoid duplicates by using different lengths.
+        for namelen in range(3, randint(4, 10)): 
             random_tag = make_random_word(a=namelen, b=namelen)
-            gen_tags[random_tag] = []
             # Avoid duplicates by using a set.
-            chosen = set(choice(self.filepaths) for _ in range(randint(1, len_fp-2)))
-            for chose in chosen:
-                api.apply_tag(chose, random_tag)  # TESTED FUNCTION
-                gen_tags[random_tag].append(chose)
-        # Now we check each tag to make sure that the appropriate files were tagged.
-        for random_tag, tagged_files in gen_tags.items():
-            with self.subTest(random_tag=random_tag, tagged_files=tagged_files):
-                tagged_files = set(tagged_files)  # In lieu of sorting.
+            files_to_tag = {os.path.split(choice(self.filepaths)) for _ in range(randint(1, len_fp-2))}
+            for (d, n) in files_to_tag:
                 with api.get_conn() as c:
-                    fetched_files = shiny.files_of_tag(c, '', random_tag)
-                    fetched_files = set(str(Path(*ff)) for ff in fetched_files)
+                    api.apply_tag(c, d, n, random_tag)  # TESTED FUNCTION
+                    with self.subTest(directory=d, name=n, tag=random_tag):
+                        self.assertIn((d, n), shiny.files_of_tag(c, '', random_tag))
+            with self.subTest(tag=random_tag):
+                with api.get_conn() as c:
+                    tagged_files = set(shiny.files_of_tag(c, '', random_tag))
                 if DEBUG:
                     logging.info("Random tag was %s.", random_tag)
-                    logging.info("Tagged files were: %s", ', '.join(tagged_files))
-                    logging.info("Fetched files were: %s", ', '.join(fetched_files))
-                self.assertEqual(tagged_files, fetched_files)
-        return
+                    logging.info("Files to tag were: %s", ', '.join(
+                        os.path.join(a, b) for (a, b) in files_to_tag))
+                    logging.info("Files actually tagged were: %s", ', '.join(
+                        os.path.join(a, b) for (a, b) in tagged_files))
+                self.assertEqual(files_to_tag, tagged_files)
 
     def test_simple_remove_tag(self):
-        fp = choice(self.filepaths)
+        d, n = os.path.split(choice(self.filepaths))
         tg = make_random_word()
-        api.apply_tag(fp, tg)
-        api.remove_tag(fp, tg)
-        with self.subTest(fp=fp, tg=tg):
+        with api.get_conn() as c:
+            api.apply_tag(c, d, n, tg)
+            api.remove_tag(c, d, n, tg)
+        with self.subTest(directory=d, name=n, tg=tg):
             with api.get_conn() as c:
-                out = shiny.tags_of_file(c, fp)
+                out = shiny.tags_of_file(c, d, n)
             self.assertEqual(out, [])
-        with self.subTest(fp=fp, tg=tg):
+        with self.subTest(directory=d, name=n, tg=tg):
             with api.get_conn() as c:
                 out = shiny.files_of_tag(c, tg)
             self.assertEqual(out, [])
@@ -229,23 +226,23 @@ class KeylessTagChangeTester(TagChangeTester):
         # number of files. We note which files that the tag was applied to.
         for namelen in range(3, randint(4, 10)):  # Avoid duplicates by various lengths.
             random_tag = make_random_word(a=namelen, b=namelen)
-            gen_tags[random_tag] = []
             # Avoid duplicates by using a set.
-            chosen = set(choice(self.filepaths) for _ in range(randint(1, len_fp-2)))
-            for chose in chosen:
-                api.apply_tag(chose, random_tag)  # TESTED FUNCTION
-                gen_tags[random_tag].append(chose)
-        # Now we check each tag to make sure that the appropriate files were tagged.
-        for random_tag, tagged_files in gen_tags.items():
-            while tagged_files:
-                tagged_file = tagged_files.pop()
-                with self.subTest(random_tag=random_tag, tagged_file=tagged_file):
-                    api.remove_tag(tagged_file, random_tag)
+            files_to_tag = set(os.path.split(choice(self.filepaths))
+                    for _ in range(randint(1, len_fp-2)))
+            for (d, n) in files_to_tag:
+                with api.get_conn() as c:
+                    api.apply_tag(c, d, n, random_tag)
+                    # Make sure we actually tagged it.
+                    self.assertIn((d, n), shiny.files_of_tag(c, '', random_tag))
+            while files_to_tag:
+                rm_d, rm_n = files_to_tag.pop()
+                with self.subTest(directory=d, name=n, tag=random_tag):
                     with api.get_conn() as c:
-                        self.assertNotIn(random_tag, shiny.tags_of_file(c, tagged_file))
-                        self.assertNotIn(tagged_file, shiny.files_of_tag(c, random_tag))
-        return
-
+                        api.remove_tag(c, rm_d, rm_n, random_tag)
+                        self.assertNotIn(random_tag, shiny.tags_of_file(c, rm_d, rm_n))
+                        self.assertNotIn((rm_d, rm_n), shiny.files_of_tag(c, '', random_tag))
+            with self.subTest(tag=random_tag):
+                self.assertFalse(shiny.files_of_tag(c, '', random_tag))
 
     def test_apply_keyed_tag_to_files(self):
         """ Same as the above test, except we're using key,value tags. """
@@ -258,25 +255,19 @@ class KeylessTagChangeTester(TagChangeTester):
         for namelen in range(3, randint(4, 10)):  # Avoid duplicates by various lengths.
             random_key = make_random_word(a=namelen, b=namelen)
             random_tag = make_random_word(a=namelen, b=namelen)
-            gen_tags[(random_key, random_tag)] = []
             # Avoid duplicates by using a set. Choose between 1 and almost-all of the files.
-            chosen = set(choice(self.filepaths) for _ in range(randint(1, len_fp-2)))
-            for chose in chosen:
-                api.apply_tag(chose, random_key, random_tag)  # TESTED FUNCTION
-                gen_tags[(random_key, random_tag)].append(chose)
-        # Now we check each tag to make sure that the appropriate files were tagged.
-        for (rk, rt), tagged_files in gen_tags.items():
-            with self.subTest(key=rk, tag=rt, tagged_files=tagged_files):
-                tagged_files = set(tagged_files)  # In lieu of sorting.
+            chosen = set(os.path.split(choice(self.filepaths)) for _ in range(randint(1, len_fp-2)))
+            for (k, v) in chosen:
                 with api.get_conn() as c:
-                    fetched_files = shiny.files_of_tag(c, rk, rt)
-                    fetched_files = set(str(Path(*ff)) for ff in fetched_files)
+                    api.apply_tag(c, k, v, random_key, random_tag)  # TESTED FUNCTION
+            with self.subTest(key=random_key, tag=random_tag, tagged_files=chosen):
+                with api.get_conn() as c:
+                    fetched_files = set(shiny.files_of_tag(c, random_key, random_tag))
                 if DEBUG:
-                    logging.info("Random key+tag were %s=%s.", rk, rt)
-                    logging.info("Tagged files were: %s", ', '.join(tagged_files))
+                    logging.info("Random key+tag were %s=%s.", random_key, random_tag)
+                    logging.info("Tagged files were: %s", ', '.join(chosen))
                     logging.info("Fetched files were: %s", ', '.join(fetched_files))
-                self.assertEqual(tagged_files, fetched_files)
-        return
+                self.assertEqual(chosen, fetched_files)
 
     @unittest.skip("Not implemented yet.")
     def test_remove_keyed_tag_from_files(self):
@@ -293,7 +284,8 @@ class KeylessTagChangeTester(TagChangeTester):
             # Avoid duplicates by using a set. Choose between 1 and almost-all of the files.
             chosen = set(choice(self.filepaths) for _ in range(randint(1, len_fp-2)))
             for chose in chosen:
-                api.apply_tag(chose, random_key, random_tag)  # TESTED FUNCTION
+                with api.get_conn() as c:
+                    api.apply_tag(c, *os.path.split(chose), random_key, random_tag)  # TESTED FUNCTION
                 gen_tags[(random_key, random_tag)].append(chose)
         # Now we check each tag to make sure that the appropriate files were tagged.
         for (rk, rt), tagged_files in gen_tags.items():
@@ -310,27 +302,33 @@ class KeylessTagChangeTester(TagChangeTester):
         return
 
     def test_add_duplicate_tag(self):
-        fp = choice(self.filepaths)
+        d, n = os.path.split(choice(self.filepaths))
         for tg in ((make_random_word(),), (make_random_word(), make_random_word())):
-            api.apply_tag(fp, *tg)
+            with api.get_conn() as c:
+                api.apply_tag(c, d, n, *tg)
             with self.assertRaises(SystemExit) as cm:
-                api.apply_tag(fp, *tg)
+                with api.get_conn() as c:
+                    api.apply_tag(c, d, n, *tg)
             self.assertEqual(cm.exception.code, 1)
 
     def test_remove_null_tag(self):
-        fp = choice(self.filepaths)
+        d, n = os.path.split(choice(self.filepaths))
         with self.assertRaises(SystemExit) as cm:
-            api.remove_tag(fp, make_random_word())
+            with api.get_conn() as c:
+                api.remove_tag(c, d, n, make_random_word())
         self.assertEqual(cm.exception.code, 1)
 
     def test_remove_orphan_file(self):
         conn = api.get_conn()
         fp = choice(self.filepaths)
         for tg in ((make_random_word(),), (make_random_word(), make_random_word())):
-            api.apply_tag(fp, *tg)
+            d, n = os.path.split(fp)
+            with api.get_conn() as c:
+                api.apply_tag(c, d, n, *tg)
             self.assertIsNotNone(conn.execute(
                 "SELECT * FROM files WHERE directory=? AND name=?", os.path.split(fp)).fetchone())
-            api.remove_tag(fp, *tg)
+            with api.get_conn() as c:
+                api.remove_tag(c, d, n, *tg)
             self.assertIsNone(conn.execute(
                 "SELECT * FROM files WHERE directory=? AND name=?", os.path.split(fp)).fetchone())
 
@@ -338,16 +336,30 @@ class KeylessTagChangeTester(TagChangeTester):
         conn = api.get_conn()
         fp = choice(self.filepaths)
         for tg in (('', make_random_word(),), (make_random_word(), make_random_word())):
-            api.apply_tag(fp, *tg)
+            d, n = os.path.split(fp)
+            with api.get_conn() as c:
+                api.apply_tag(c, d, n, *tg)
             self.assertIsNotNone(conn.execute(
                 "SELECT * FROM tags WHERE key=? AND value=?", tg).fetchone())
-            api.remove_tag(fp, *tg)
+            with api.get_conn() as c:
+                api.remove_tag(c, d, n, *tg)
             self.assertIsNone(conn.execute(
                 "SELECT * FROM tags WHERE key=? AND value=?", tg).fetchone())
 
     def test_merge_tag(self):
-        for parent_tag in (('', make_random_word()), (make_random_word(), make_random_word())):
-            child_tag = (parent_tag[0], parent_tag[1]+'_foo')
-            pass
-
-
+        parent_tags = [('', make_random_word()), (make_random_word(), make_random_word())]
+        for parent_tag in parent_tags:
+            child_tags = [('', parent_tag[1]+"_fob"), (parent_tag[0]+"_bar", parent_tag[1]+"_bar"),
+                          (parent_tag[0], parent_tag[1]+"_bax"), (parent_tag[0]+"_bai", parent_tag[1])]
+            for child_tag in child_tags:
+                with self.subTest(primary=parent_tag, secondary=child_tag):
+                    tagged_files = []
+                    for _ in range(randint(2, 5)):
+                        fp = os.path.split(choice(self.filepaths))
+                        tagged_files.append(fp)
+                        with api.get_conn() as c:
+                            api.apply_tag(c, *fp, *child_tag)
+                    with api.get_conn() as c:
+                        api.merge_tag(c, *parent_tag, *child_tag)
+                        self.assertEqual(set(tagged_files),
+                                set(shiny.files_of_tag(c, *parent_tag)))

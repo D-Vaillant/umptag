@@ -147,12 +147,12 @@ def _get_or_add_file(c, directory, name, **kw) -> Union[tuple, None]:
     #return c.execute("SELECT directory, name FROM files WHERE directory = ? AND name = ? LIMIT 1").fetchone()
 
 # Public methods.
-def tags_of_file(c, path, cols=('key', 'value')):
+def tags_of_file(c, directory, name, cols=('key', 'value')):
     res = c.execute(f"""SELECT {', '.join(cols)} FROM filetag_junction J
             INNER JOIN tags ON tags.id = J.tag_id
             INNER JOIN files ON files.id = J.file_id
             WHERE files.directory = ? AND files.name = ?""",
-            os.path.split(path))
+            (directory, name))
     # res = [(r[1] if r[0] == '' else r) for r in res.fetchall()]
     return res.fetchall()
 
@@ -167,16 +167,20 @@ def files_of_tag(c, key='', value=None, cols=('directory', 'name')):
     return res.fetchall()
 
 # Actual usage!
-def tag_file(c, filepath, key="", value=None):
-    if value is None and key != '':
-        key, value = '', key
-    directory, name = os.path.split(filepath)
+def tag_file(c, directory, name, key, value):
     _get_or_add_file(c, directory, name)
     tags.get_or_add_tag(c, key, value)
     try:
         _relate_tag_and_file(c, directory, name, key, value)
     except sqlite3.IntegrityError:
         sys.exit(1)
+    return
+
+def clean_orphans(c, directory, name, key, value):
+    if files_of_tag(c, key, value) == []:
+        tags._delete_tag(c, key, value)
+    if tags_of_file(c, directory, name) == []:
+        _delete_file(c, directory, name)
     return
 
 """SELECT {', '.join(('files.'+col for col in cols)} from files INNER JOIN filetag_junction ON file.id = filetag_junction.file_id WHERE filetag_junction.tag_id = N"""
