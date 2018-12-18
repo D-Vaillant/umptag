@@ -128,7 +128,7 @@ def tag_file(c, directory, name, key, value):
     return 0
 
 def untag_file(c, directory, name, key, value):
-    if (key, value) not in tags_of_file(conn, directory, name):
+    if (key, value) not in tags_of_file(c, directory, name):
         return 1
     _unrelate_tag_and_file(c, directory, name, key, value)
     clean_orphans(c, directory, name, key, value)

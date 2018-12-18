@@ -1,4 +1,4 @@
-import shiny, database
+import database
 import sqlite3
 import unittest
 from pyfakefs.fake_filesystem_unittest import TestCase

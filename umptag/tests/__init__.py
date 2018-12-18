@@ -2,7 +2,7 @@ import sqlite3
 import unittest
 import logging
 from pyfakefs.fake_filesystem_unittest import TestCase
-from .. import shiny, database
+from .. import database
 
 
 format_ = "%(levelname)s :: %(funcName)s -> %(message)s"

@@ -2,10 +2,8 @@ import os
 import os.path
 import unittest
 from sqlite3 import IntegrityError, DatabaseError, OperationalError
-#from umptag import shiny, tags
-from umptag import shiny, tags
 from umptag.tests import DBTester
-from .. import shiny, tags
+from .. import tags
 # from . import DBTester
 
 

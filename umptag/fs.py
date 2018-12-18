@@ -1,4 +1,7 @@
+from typing import Union
+from datetime import datetime
 import os
+import sqlite3
 
 def collect_files(root_dir=os.curdir, filter_=lambda x: True):
     # This is probably just going to wrap os.walk.
