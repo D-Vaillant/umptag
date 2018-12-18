@@ -22,3 +22,23 @@ class DBTester(TestCase):
 
     def tearDown(self):
         self.conn.close()
+
+
+class RealFS_DBTester(unittest.TestCase):
+    """ Creates a temporary folder and changes into it.
+    Deletes it afterwards. """
+    def setUp(self):
+        #self.tmp_directory = os.path.abspath('.ump_tmp')
+        self.start = os.getcwd()
+        self.tmpdir = '.ump_tmp'
+        try:
+            os.mkdir(self.tmpdir)
+        except FileExistsError:
+            self.tearDown()
+            unittest.skip("Folder already existed; tearing down and skipping.")
+        os.chdir(self.tmpdir)
+
+    def tearDown(self):
+        os.chdir(self.start)
+        rmtree(self.tmpdir)
+

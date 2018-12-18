@@ -1,53 +1,18 @@
 import logging
-import os, os.path
-from shutil import rmtree
-import unittest
+import os
+import os.path
 import sqlite3
-from random import randint, choice
-from pyfakefs.fake_filesystem_unittest import TestCase, Patcher
-from . import DBTester
-from .utilities import make_random_word, get_random_hierarchy
-from .. import tags, api, fs, filetags, database
+import unittest
 from pathlib import Path
-
-
-"""
-class FilesystemTester(DBTester):
-    def test_collect_files_flat(self):
-        hier = get_random_hierarchy(structure=[(lambda: randint(2, 6), 0)])
-        # Make a flat file hierarchy.
-        fs_files = sorted(hier[0]+hier[1])  # Store those in here.
-        fetched_files = sorted(files.collect_files())
-        self.assertEqual(fs_files, fetched_files)
-
-    def test_collect_files_nested(self):
-        # Make a non-flat hierarchy.
-        struct = ((lambda: randint(0, 5), lambda: randint(2, 3)),
-                  (lambda: randint(1, 3), lambda: randint(1, 3)),
-                  (lambda: randint(1, 5), 0))
-        hier = get_random_hierarchy(structure=struct)
-        fs_files = sorted(hier[0]+hier[1])  # Store those in here.
-        fetched_files = sorted(files.collect_files())
-        self.assertEqual(fs_files, fetched_files)
-"""
-
-class RealFS_DBTester(unittest.TestCase):
-    """ Creates a temporary folder and changes into it.
-    Deletes it afterwards. """
-    def setUp(self):
-        #self.tmp_directory = os.path.abspath('.ump_tmp')
-        self.start = os.getcwd()
-        self.tmpdir = '.ump_tmp'
-        try:
-            os.mkdir(self.tmpdir)
-        except FileExistsError:
-            # self.tearDown()
-            unittest.skip("Folder already existed; tearing down and skipping.")
-        os.chdir(self.tmpdir)
-
-    def tearDown(self):
-        os.chdir(self.start)
-        rmtree(self.tmpdir)
+from shutil import rmtree
+from random import randint, choice
+from . import DBTester, RealFS_DBTester
+from .utilities import make_random_word, get_random_hierarchy
+from .. import (api,
+                fs,
+                tags,
+                filetags,
+                database)
 
 
 class FindDatabaseTester(DBTester):
