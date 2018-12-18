@@ -43,4 +43,3 @@ class RealFS_DBTester(unittest.TestCase):
     def tearDown(self):
         chdir(self.start)
         rmtree(self.tmpdir)
-
