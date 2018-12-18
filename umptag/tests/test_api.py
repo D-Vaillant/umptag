@@ -297,26 +297,43 @@ class GetInfo_TagChangeTester(TagChangeTester):
                         apply_tag(c, d, n)
         with self.subTest("Testing show_tags."):
             for file, tagged in tagged_files.items():
-                tagged = [(k+'=' if k else '')+t for (k, t) in tagged]
-                tagged_str = ', '.join(tagged)
+                tagged = set((k+'=' if k else '')+t for (k, t) in tagged)
                 with database.get_conn(self.db_name) as c:
-                    show_output = api.show_tags(c, *file)
-                self.assertEqual(f"File '{os.path.join(d, n)}' has tags: {tagged_str}.",
-                                show_output)
+                    self.assertEqual(tagged, set(api.show_tags(c, *file)))
         with self.subTest("Testing show_files."):
             for tag_, files_ in filed_tags.items():
                 tag_str = (tag_[0]+'=' if tag_[0] else '')+tag_[1]
-                filed = [os.path.join(d, n) for (d, n) in files_]
-                filed_str = ', '.join(tagged)
+                filed = set(os.path.join(d, n) for (d, n) in files_)
                 with database.get_conn(self.db_name) as c:
-                    show_output = api.show_files(c, *tag_)
-                self.assertEqual(f"{tag_str} => {filed_str}.",
-                                show_output)
+                    show_output = set(api.show_files(c, *tag_))
 
 
     def test_show_files(self):
         """ Testing printing out what files have a specific tag. """
+        pass
 
+
+def tag_sorter(kv1, kv2):
+    """ This is going to be USEFUL at some point """
+    k1, v1 = kv1
+    k2, v2 = kv2
+    if k1 == '':
+        if k2 != '':
+            # kv1 is unkeyed, kv2 not
+            return True
+        else:
+            # Both unkeyed
+            return v1 <= v2
+    elif k2 == '':
+        # kv2 unkeyed, kv1 not
+        return False
+    elif k1 < k2:
+        return True
+    elif k1 == k2:
+        return v1 <= v2
+    else:
+        return False
+            
 
 # Let's redo all of these suckers but with a COMPLETELY DIFFERENT DATABASE NAME
 def is_test_method(cls, func):
