@@ -135,6 +135,8 @@ class Keyless_TagChangeTester(TagChangeTester):
 
 
 class Keyed_TagChangeTester(TagChangeTester):
+    """ Note: can't this just be folded into the default one?
+    I'd have to rewrite some of the logic; maybe using lambdas... """
     def test_apply_keyed_tag_to_files(self):
         DEBUG = False
         # Choose some random files to tag.
@@ -143,13 +145,19 @@ class Keyed_TagChangeTester(TagChangeTester):
         # We create a random number of tags and then apply it to a random
         # number of files. We note which files that the tag was applied to.
         for namelen in range(3, randint(4, 10)):  # Avoid duplicates by various lengths.
-            random_key = make_random_word(a=namelen, b=namelen)
             random_tag = make_random_word(a=namelen, b=namelen)
+            if False:
+                random_key = ''
+                apply_tag = lambda d, n: api.apply_tag(c, d, n, random_key)
+            else:
+                random_key = make_random_word(a=namelen, b=namelen)
+                apply_tag = lambda d, n: api.apply_tag(c, d, n, random_key, random_tag)
             # Avoid duplicates by using a set. Choose between 1 and almost-all of the files.
             chosen = set(os.path.split(choice(self.filepaths)) for _ in range(randint(1, len_fp-2)))
-            for (k, v) in chosen:
+            for (d, n) in chosen:
                 with database.get_conn(self.db_name) as c:
-                    api.apply_tag(c, k, v, random_key, random_tag)  # TESTED FUNCTION
+                    # api.apply_tag(c, k, v, random_key, random_tag)  # TESTED FUNCTION
+                    apply_tag(d, n)
             with self.subTest(key=random_key, tag=random_tag, tagged_files=chosen):
                 with database.get_conn(self.db_name) as c:
                     fetched_files = set(filetags.files_of_tag(c, random_key, random_tag))
@@ -167,20 +175,31 @@ class Keyed_TagChangeTester(TagChangeTester):
         # We create a random number of tags and then apply it to a random
         # number of files. We note which files that the tag was applied to.
         for namelen in range(3, randint(4, 10)):  # Avoid duplicates by various lengths.
-            random_key = make_random_word(a=namelen, b=namelen)
             random_tag = make_random_word(a=namelen, b=namelen)
+            if False:
+                random_key = ''
+                apply_tag = lambda d, n: api.apply_tag(
+                        c, d, n, random_tag)
+                remove_tag = lambda rm_d, rm_n: api.remove_tag(
+                        c, rm_d, rm_n, random_tag)
+            else:
+                random_key = make_random_word(a=namelen, b=namelen)
+                apply_tag = lambda d, n: api.apply_tag(
+                        c, d, n, random_key, random_tag)
+                remove_tag = lambda rm_d, rm_n: api.remove_tag(
+                        c, rm_d, rm_n, random_key, random_tag)
             # Avoid duplicates by using a set.
             files_to_tag = set(os.path.split(choice(self.filepaths))
                     for _ in range(randint(1, len_fp-2)))
             for (d, n) in files_to_tag:
                 with database.get_conn(self.db_name) as c:
-                    api.apply_tag(c, d, n, random_key, random_tag)
+                    apply_tag(d, n)
                     # Make sure we actually tagged it.
                     self.assertIn((d, n), filetags.files_of_tag(c, random_key, random_tag))
             while files_to_tag:
                 rm_d, rm_n = files_to_tag.pop()
                 with database.get_conn(self.db_name) as c:
-                    api.remove_tag(c, rm_d, rm_n, random_key, random_tag)
+                    remove_tag(rm_d, rm_n)
                     self.assertNotIn(random_tag, filetags.tags_of_file(c, rm_d, rm_n))
                     self.assertNotIn((rm_d, rm_n), filetags.files_of_tag(c, random_key, random_tag))
             with self.subTest(key=random_key, tag=random_tag):

@@ -60,9 +60,9 @@ class TestFileFunctions(DBTester):
                                     )
                             else:
                                 # To account for lag.
-                                time_diff = all_cols.get(col) - fs._get_file_property(c, d, n, col)
+                                time_diff = abs(all_cols.get(col) - 
+                                                fs._get_file_property(c, d, n, col))
                                 self.assertTrue(time_diff <= timedelta(milliseconds=1))
-                                self.assertTrue(time_diff >= timedelta(milliseconds=-1))
 
     def test_get_safety(self):
         with self.assertRaises(OperationalError):
@@ -109,21 +109,24 @@ class TestFileFunctions(DBTester):
 
     def test_correct_metadata(self):
         for (fp, file) in ((self.fake_filepath, self.fake_file), (self.fake_dirpath, self.fake_dir)):
-            with self.subTest(fp=fp, file=file):
-                d, n = os.path.split(fp)
-                # Filesize
-                rand_size = randrange(1500, 30000)
-                file.st_size = rand_size
-                # Modified Time
-                rand_time = round(uniform(1 * (6**8), 1 * (9**10)), 4)
-                file.st_mtime = rand_time
-                rand_time = datetime.fromtimestamp(rand_time)
-                fs._add_file(self.conn.cursor(), d, n)
-                results = self.conn.cursor().execute(
-                        "SELECT mod_time, size, is_dir FROM files WHERE directory = ? AND name = ?",
-                        (d, n)).fetchone()
-                # TODO Change the rand_time check so it's more forgiving.
-                self.assertEqual((rand_time, rand_size, os.path.isdir(fp)), results)
+            d, n = os.path.split(fp)
+            # Filesize
+            rand_size = randrange(1500, 30000)
+            file.st_size = rand_size
+            # Modified Time
+            rand_time = round(uniform(1 * (6**8), 1 * (9**10)), 4)
+            file.st_mtime = rand_time
+            rand_time = datetime.fromtimestamp(rand_time)
+            fs._add_file(self.conn.cursor(), d, n)
+            results = self.conn.cursor().execute(
+                    "SELECT mod_time, size, is_dir FROM files WHERE directory = ? AND name = ?",
+                    (d, n)).fetchone()
+            self.assertEqual((rand_time, rand_size, os.path.isdir(fp)), results)
+            self.assertEqual(rand_size, results[1])
+            self.assertEqual(os.path.isdir(fp), results[2])
+            time_diff = abs(results[0] - rand_time)
+            self.assertTrue(time_diff <= timedelta(milliseconds=1)) 
+
 
     # Test `get_or_add_file`.
     def test_file_getoradd_adding(self):
