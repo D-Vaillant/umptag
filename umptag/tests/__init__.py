@@ -1,6 +1,8 @@
 import sqlite3
 import unittest
 import logging
+from os import getcwd, mkdir, chdir
+from shutil import rmtree
 from pyfakefs.fake_filesystem_unittest import TestCase
 from .. import database
 
@@ -29,16 +31,16 @@ class RealFS_DBTester(unittest.TestCase):
     Deletes it afterwards. """
     def setUp(self):
         #self.tmp_directory = os.path.abspath('.ump_tmp')
-        self.start = os.getcwd()
+        self.start = getcwd()
         self.tmpdir = '.ump_tmp'
         try:
-            os.mkdir(self.tmpdir)
+            mkdir(self.tmpdir)
         except FileExistsError:
             self.tearDown()
             unittest.skip("Folder already existed; tearing down and skipping.")
-        os.chdir(self.tmpdir)
+        chdir(self.tmpdir)
 
     def tearDown(self):
-        os.chdir(self.start)
+        chdir(self.start)
         rmtree(self.tmpdir)
 

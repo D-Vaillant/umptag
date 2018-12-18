@@ -4,7 +4,6 @@ import os.path
 import sqlite3
 import unittest
 from pathlib import Path
-from shutil import rmtree
 from random import randint, choice
 from . import DBTester, RealFS_DBTester
 from .utilities import make_random_word, get_random_hierarchy
