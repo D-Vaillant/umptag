@@ -15,6 +15,12 @@ def _get_file_properties(c, directory, name, cols=('directory', 'name')) -> Unio
     return c.execute(f"""SELECT {', '.join(cols)} FROM files WHERE
             directory = ? AND name = ? LIMIT 1""", (directory, name)).fetchone()
 
+def _get_file_property(c, directory, name, col) -> Union[str, int, float, None]:
+    try:
+        return _get_file_properties(c, directory, name, cols=(col,))[0]
+    except IndexError:
+        return None
+
 def _get_file_from_id(c, id_, cols=('directory', 'name')):
     return c.execute(f"""SELECT {', '.join(cols)} FROM files WHERE
             id = ?""", (id_,)).fetchone()
@@ -25,13 +31,6 @@ def _get_file(c, directory, name):
     """ Returns (path,). Weird.
     Can be replaced with a _file_exists thing. """
     return _get_file_properties(c, directory, name, cols=('directory', 'name'))
-
-def _get_file_id(c, directory, name) -> Union[int, None]:
-    """ Returns the id of the file corresponding to the path. """
-    try:
-        return _get_file_properties(c, directory, name, cols=('id',))[0]
-    except IndexError:
-        return None
 
 def _add_file(c, directory, name):
     """ Adds a file. Raises an IntegrityError if it already exists.

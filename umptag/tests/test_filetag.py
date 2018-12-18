@@ -66,7 +66,7 @@ class TestFiletagJunctionFunctions(JunctionTester):
                     logging.debug("Using pair <%s=%s>.", (*pair))
                     tags.get_or_add_tag(c, *pair)  # Adding the tag.
                     # We check that it works by getting the ids directly.
-                    file_id = fs._get_file_id(c, d, n)
+                    file_id = fs._get_file_property(c, d, n, 'id')
                     tag_id = c.execute("SELECT id FROM tags WHERE key=? AND value=?", pair).fetchone()[0]
                     # tag_id = tags.tag_kv_to_id(c, *pair)
                     logging.debug("Checking if the database has the pair "

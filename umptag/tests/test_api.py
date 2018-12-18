@@ -24,7 +24,7 @@ class TagChangeTester(RealFS_DBTester):
         self.dirpaths: A list of the directories. All top-level.
         """
         super().setUp()
-        self.db_name = api.DEFAULT_DB_NAME
+        self.db_name = database.DEFAULT_DB_NAME
         self.filepaths = [make_random_word() for _ in range(randint(3, 6))]
         for fp in self.filepaths:
             # I just used pathlib here. Dang. Oh well.
@@ -42,7 +42,7 @@ class TagChangeTester(RealFS_DBTester):
                 # Path(dp, stem).touch()
                 # self.fs.create_file(dp+os.sep+stem)
                 # self.dirpaths[dp].append(stem)
-        api.initialize_conn()
+        database.initialize_conn(self.db_name, True)
         return
 
 
@@ -54,14 +54,14 @@ class Keyless_TagChangeTester(TagChangeTester):
     def test_simple_apply_tag(self):
         d, n = os.path.split(choice(self.filepaths))
         tg = make_random_word()
-        with api.get_conn(self.db_name) as c:
+        with database.get_conn(self.db_name) as c:
             api.apply_tag(c, d, n, tg)  # TESTED FUNCTION
         with self.subTest(directory=d, name=d, tg=tg):
-            with api.get_conn(self.db_name) as c:
+            with database.get_conn(self.db_name) as c:
                 out = filetags.tags_of_file(c, d, n)
             self.assertEqual(out[0], ('', tg))
         with self.subTest(directory=d, name=n, tg=tg):
-            with api.get_conn(self.db_name) as c:
+            with database.get_conn(self.db_name) as c:
                 out = filetags.files_of_tag(c, '', tg)
             self.assertEqual(out[0], (d, n))
         return  # Because otherwise we'll get LOST
@@ -75,12 +75,12 @@ class Keyless_TagChangeTester(TagChangeTester):
             # Avoid duplicates by using a set.
             files_to_tag = {os.path.split(choice(self.filepaths)) for _ in range(randint(1, len_fp-2))}
             for (d, n) in files_to_tag:
-                with api.get_conn(self.db_name) as c:
+                with database.get_conn(self.db_name) as c:
                     api.apply_tag(c, d, n, random_tag)  # TESTED FUNCTION
                     with self.subTest(directory=d, name=n, tag=random_tag):
                         self.assertIn((d, n), filetags.files_of_tag(c, '', random_tag))
             with self.subTest(tag=random_tag):
-                with api.get_conn(self.db_name) as c:
+                with database.get_conn(self.db_name) as c:
                     tagged_files = set(filetags.files_of_tag(c, '', random_tag))
                 if DEBUG:
                     logging.info("Random tag was %s.", random_tag)
@@ -93,15 +93,15 @@ class Keyless_TagChangeTester(TagChangeTester):
     def test_simple_remove_tag(self):
         d, n = os.path.split(choice(self.filepaths))
         tg = make_random_word()
-        with api.get_conn(self.db_name) as c:
+        with database.get_conn(self.db_name) as c:
             api.apply_tag(c, d, n, tg)
             api.remove_tag(c, d, n, tg)
         with self.subTest(directory=d, name=n, tg=tg):
-            with api.get_conn(self.db_name) as c:
+            with database.get_conn(self.db_name) as c:
                 out = filetags.tags_of_file(c, d, n)
             self.assertEqual(out, [])
         with self.subTest(directory=d, name=n, tg=tg):
-            with api.get_conn(self.db_name) as c:
+            with database.get_conn(self.db_name) as c:
                 out = filetags.files_of_tag(c, '', tg)
             self.assertEqual(out, [])
         return  # Because otherwise we'll get LOST
@@ -119,14 +119,14 @@ class Keyless_TagChangeTester(TagChangeTester):
             files_to_tag = set(os.path.split(choice(self.filepaths))
                     for _ in range(randint(1, len_fp-2)))
             for (d, n) in files_to_tag:
-                with api.get_conn(self.db_name) as c:
+                with database.get_conn(self.db_name) as c:
                     api.apply_tag(c, d, n, random_tag)
                     # Make sure we actually tagged it.
                     self.assertIn((d, n), filetags.files_of_tag(c, '', random_tag))
             while files_to_tag:
                 rm_d, rm_n = files_to_tag.pop()
                 with self.subTest(directory=d, name=n, tag=random_tag):
-                    with api.get_conn(self.db_name) as c:
+                    with database.get_conn(self.db_name) as c:
                         api.remove_tag(c, rm_d, rm_n, random_tag)
                         self.assertNotIn(random_tag, filetags.tags_of_file(c, rm_d, rm_n))
                         self.assertNotIn((rm_d, rm_n), filetags.files_of_tag(c, '', random_tag))
@@ -148,10 +148,10 @@ class Keyed_TagChangeTester(TagChangeTester):
             # Avoid duplicates by using a set. Choose between 1 and almost-all of the files.
             chosen = set(os.path.split(choice(self.filepaths)) for _ in range(randint(1, len_fp-2)))
             for (k, v) in chosen:
-                with api.get_conn(self.db_name) as c:
+                with database.get_conn(self.db_name) as c:
                     api.apply_tag(c, k, v, random_key, random_tag)  # TESTED FUNCTION
             with self.subTest(key=random_key, tag=random_tag, tagged_files=chosen):
-                with api.get_conn(self.db_name) as c:
+                with database.get_conn(self.db_name) as c:
                     fetched_files = set(filetags.files_of_tag(c, random_key, random_tag))
                 if DEBUG:
                     logging.info("Random key+tag were %s=%s.", random_key, random_tag)
@@ -173,13 +173,13 @@ class Keyed_TagChangeTester(TagChangeTester):
             files_to_tag = set(os.path.split(choice(self.filepaths))
                     for _ in range(randint(1, len_fp-2)))
             for (d, n) in files_to_tag:
-                with api.get_conn(self.db_name) as c:
+                with database.get_conn(self.db_name) as c:
                     api.apply_tag(c, d, n, random_key, random_tag)
                     # Make sure we actually tagged it.
                     self.assertIn((d, n), filetags.files_of_tag(c, random_key, random_tag))
             while files_to_tag:
                 rm_d, rm_n = files_to_tag.pop()
-                with api.get_conn(self.db_name) as c:
+                with database.get_conn(self.db_name) as c:
                     api.remove_tag(c, rm_d, rm_n, random_key, random_tag)
                     self.assertNotIn(random_tag, filetags.tags_of_file(c, rm_d, rm_n))
                     self.assertNotIn((rm_d, rm_n), filetags.files_of_tag(c, random_key, random_tag))
@@ -202,9 +202,9 @@ class Merge_TagChangeTester(TagChangeTester):
             for _ in range(randint(2, 5)):
                 fp = os.path.split(choice(self.filepaths))
                 tagged_files.append(fp)
-                with api.get_conn(self.db_name) as c:
+                with database.get_conn(self.db_name) as c:
                     api.apply_tag(c, *fp, *child_tag)
-            with api.get_conn(self.db_name) as c:
+            with database.get_conn(self.db_name) as c:
                 api.merge_tag(c, *parent_tag, *child_tag)
                 self.assertEqual(set(tagged_files),
                         set(filetags.files_of_tag(c, *parent_tag)))
@@ -216,42 +216,42 @@ class Error_TagChangeTester(TagChangeTester):
     def test_add_duplicate_tag(self):
         d, n = os.path.split(choice(self.filepaths))
         for tg in ((make_random_word(),), (make_random_word(), make_random_word())):
-            with api.get_conn(self.db_name) as c:
+            with database.get_conn(self.db_name) as c:
                 api.apply_tag(c, d, n, *tg)
-            with api.get_conn(self.db_name) as c:
+            with database.get_conn(self.db_name) as c:
                 self.assertEqual(1, api.apply_tag(c, d, n, *tg))
 
     def test_remove_null_tag(self):
         d, n = os.path.split(choice(self.filepaths))
-        with api.get_conn(self.db_name) as c:
+        with database.get_conn(self.db_name) as c:
             self.assertEqual(1, api.remove_tag(c, d, n, make_random_word()))
 
 
 class Orphan_TagChangeTester(TagChangeTester):
     def test_remove_orphan_file(self):
-        conn = api.get_conn(self.db_name)
+        conn = database.get_conn(self.db_name)
         fp = choice(self.filepaths)
         for tg in ((make_random_word(),), (make_random_word(), make_random_word())):
             d, n = os.path.split(fp)
-            with api.get_conn(self.db_name) as c:
+            with database.get_conn(self.db_name) as c:
                 api.apply_tag(c, d, n, *tg)
             self.assertIsNotNone(conn.execute(
                 "SELECT * FROM files WHERE directory=? AND name=?", os.path.split(fp)).fetchone())
-            with api.get_conn(self.db_name) as c:
+            with database.get_conn(self.db_name) as c:
                 api.remove_tag(c, d, n, *tg)
             self.assertIsNone(conn.execute(
                 "SELECT * FROM files WHERE directory=? AND name=?", os.path.split(fp)).fetchone())
 
     def test_remove_orphan_tag(self):
-        conn = api.get_conn(self.db_name)
+        conn = database.get_conn(self.db_name)
         fp = choice(self.filepaths)
         for tg in (('', make_random_word(),), (make_random_word(), make_random_word())):
             d, n = os.path.split(fp)
-            with api.get_conn(self.db_name) as c:
+            with database.get_conn(self.db_name) as c:
                 api.apply_tag(c, d, n, *tg)
             self.assertIsNotNone(conn.execute(
                 "SELECT * FROM tags WHERE key=? AND value=?", tg).fetchone())
-            with api.get_conn(self.db_name) as c:
+            with database.get_conn(self.db_name) as c:
                 api.remove_tag(c, d, n, *tg)
             self.assertIsNone(conn.execute(
                 "SELECT * FROM tags WHERE key=? AND value=?", tg).fetchone())

@@ -1,6 +1,6 @@
 import os
 import os.path
-from datetime import datetime
+from datetime import datetime, timedelta
 from random import uniform, randrange
 from sqlite3 import IntegrityError, OperationalError
 # My modules.
@@ -50,12 +50,19 @@ class TestFileFunctions(DBTester):
                         ('name',),
                         ('directory', 'size')]
                 for var in vars:
-                    with self.subTest(var=var):
-                        self.assertEqual(
-                            tuple(all_cols.get(k) for k in var),
-                            fs._get_file_properties(self.conn.cursor(),
-                                            d, n, cols=var)
-                            )
+                    for col in var:
+                        c = self.conn.cursor()
+                        with self.subTest(col=col):
+                            if col != 'mod_time':
+                                self.assertEqual(
+                                    all_cols.get(col),
+                                    fs._get_file_property(c, d, n, col)
+                                    )
+                            else:
+                                # To account for lag.
+                                time_diff = all_cols.get(col) - fs._get_file_property(c, d, n, col)
+                                self.assertTrue(time_diff <= timedelta(milliseconds=1))
+                                self.assertTrue(time_diff >= timedelta(milliseconds=-1))
 
     def test_get_safety(self):
         with self.assertRaises(OperationalError):

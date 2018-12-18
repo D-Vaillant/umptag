@@ -36,8 +36,9 @@ class RealFS_DBTester(unittest.TestCase):
         try:
             mkdir(self.tmpdir)
         except FileExistsError:
-            self.tearDown()
-            unittest.skip("Folder already existed; tearing down and skipping.")
+            rmtree(self.tmpdir)
+            mkdir(self.tmpdir)
+            logging.warning(".ump_tmp directory already existed; deleted and recreated.")
         chdir(self.tmpdir)
 
     def tearDown(self):
