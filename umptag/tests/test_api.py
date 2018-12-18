@@ -289,16 +289,15 @@ class KeylessTagChangeTester(TagChangeTester):
                 gen_tags[(random_key, random_tag)].append(chose)
         # Now we check each tag to make sure that the appropriate files were tagged.
         for (rk, rt), tagged_files in gen_tags.items():
-            with self.subTest(key=rk, tag=rt, tagged_files=tagged_files):
-                tagged_files = set(tagged_files)  # In lieu of sorting.
-                with api.get_conn() as c:
-                    fetched_files = shiny.files_of_tag(c, rk, rt)
-                    fetched_files = set(str(Path(*ff)) for ff in fetched_files)
-                if DEBUG:
-                    logging.info("Random key+tag were %s=%s.", rk, rt)
-                    logging.info("Tagged files were: %s", ', '.join(tagged_files))
-                    logging.info("Fetched files were: %s", ', '.join(fetched_files))
-                self.assertEqual(tagged_files, fetched_files)
+            tagged_files = set(tagged_files)  # In lieu of sorting.
+            with api.get_conn() as c:
+                fetched_files = shiny.files_of_tag(c, rk, rt)
+                fetched_files = set(str(Path(*ff)) for ff in fetched_files)
+            if DEBUG:
+                logging.info("Random key+tag were %s=%s.", rk, rt)
+                logging.info("Tagged files were: %s", ', '.join(tagged_files))
+                logging.info("Fetched files were: %s", ', '.join(fetched_files))
+            self.assertEqual(tagged_files, fetched_files)
         return
 
     def test_add_duplicate_tag(self):
@@ -306,17 +305,13 @@ class KeylessTagChangeTester(TagChangeTester):
         for tg in ((make_random_word(),), (make_random_word(), make_random_word())):
             with api.get_conn() as c:
                 api.apply_tag(c, d, n, *tg)
-            with self.assertRaises(SystemExit) as cm:
-                with api.get_conn() as c:
-                    api.apply_tag(c, d, n, *tg)
-            self.assertEqual(cm.exception.code, 1)
+            with api.get_conn() as c:
+                self.assertEqual(1, api.apply_tag(c, d, n, *tg))
 
     def test_remove_null_tag(self):
         d, n = os.path.split(choice(self.filepaths))
-        with self.assertRaises(SystemExit) as cm:
-            with api.get_conn() as c:
-                api.remove_tag(c, d, n, make_random_word())
-        self.assertEqual(cm.exception.code, 1)
+        with api.get_conn() as c:
+            self.assertEqual(1, api.remove_tag(c, d, n, make_random_word()))
 
     def test_remove_orphan_file(self):
         conn = api.get_conn()
@@ -349,17 +344,21 @@ class KeylessTagChangeTester(TagChangeTester):
     def test_merge_tag(self):
         parent_tags = [('', make_random_word()), (make_random_word(), make_random_word())]
         for parent_tag in parent_tags:
+            """
             child_tags = [('', parent_tag[1]+"_fob"), (parent_tag[0]+"_bar", parent_tag[1]+"_bar"),
                           (parent_tag[0], parent_tag[1]+"_bax"), (parent_tag[0]+"_bai", parent_tag[1])]
             for child_tag in child_tags:
-                with self.subTest(primary=parent_tag, secondary=child_tag):
-                    tagged_files = []
-                    for _ in range(randint(2, 5)):
-                        fp = os.path.split(choice(self.filepaths))
-                        tagged_files.append(fp)
-                        with api.get_conn() as c:
-                            api.apply_tag(c, *fp, *child_tag)
-                    with api.get_conn() as c:
-                        api.merge_tag(c, *parent_tag, *child_tag)
-                        self.assertEqual(set(tagged_files),
-                                set(shiny.files_of_tag(c, *parent_tag)))
+            """
+            child_tag = (parent_tag[1], parent_tag[0])
+            tagged_files = []
+            for _ in range(randint(2, 5)):
+                fp = os.path.split(choice(self.filepaths))
+                tagged_files.append(fp)
+                with api.get_conn() as c:
+                    api.apply_tag(c, *fp, *child_tag)
+            with api.get_conn() as c:
+                api.merge_tag(c, *parent_tag, *child_tag)
+                self.assertEqual(set(tagged_files),
+                        set(shiny.files_of_tag(c, *parent_tag)))
+                self.assertFalse(shiny.files_of_tag(c, *child_tag))
+                self.assertFalse(tags._exists_tag(c, *child_tag))

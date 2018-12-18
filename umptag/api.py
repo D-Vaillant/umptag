@@ -2,7 +2,7 @@ import sqlite3
 import functools
 import os.path
 import sys
-from . import shiny, tags
+from . import tags, fs, filetags
 from . import database as db
 
 
@@ -49,20 +49,15 @@ def database_cognant(func, *args):
 def apply_tag(conn, directory, name, key='', value=None):
     if value is None and key != '':
         key, value = '', key
-    shiny.tag_file(conn, directory, name, key, value)
-    return 0
+    return filetags.tag_file(conn, directory, name, key, value)
+
 
 def remove_tag(conn, directory, name, key='', value=None):
     """ Removes the tag or key=value tag from the given target. """
     if value is None and key != '':
         key, value = '', key
-    if (key, value) not in shiny.tags_of_file(conn, directory, name):
-        # No need!
-        print("%s lacks that tag." % os.path.join(directory, name))
-        return 1
-    shiny._unrelate_tag_and_file(conn, directory, name, key, value)
-    shiny.clean_orphans(conn, directory, name, key, value)
-    return 0
+    return filetags.untag_file(conn, directory, name, key, value)
+
 
 def remove_tags(conn, directory, name, *args, **kwargs):
     """ Removes multiple tags from a given file. """
@@ -72,6 +67,7 @@ def remove_tags(conn, directory, name, *args, **kwargs):
     for (k, v) in kwargs.items():
         results.append(remove_tag(conn, directory, name, k, v))
     return 1 if any(results) else 0  # Exit message 1 if any fail.
+
 
 def merge_tag(conn, primary_key='', primary_value=None,
                     secondary_key='', secondary_value=None):
@@ -83,8 +79,8 @@ def merge_tag(conn, primary_key='', primary_value=None,
         primary_key, primary_value = '', primary_key
     if secondary_value is None and secondary_key != '':
         secondary_key, secondary_value = '', secondary_key
-    for (d, n) in shiny.files_of_tag(conn, secondary_key, secondary_value):
-        shiny.tag_file(conn, d, n, primary_key, primary_value)
+    for (d, n) in filetags.files_of_tag(conn, secondary_key, secondary_value):
+        filetags.tag_file(conn, d, n, primary_key, primary_value)
         remove_tag(conn, d, n, secondary_key, secondary_value)
 
 
