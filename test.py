@@ -13,6 +13,7 @@ def suite():
     load(suite, 'umptag.tests.test_files')
     load(suite, 'umptag.tests.test_filetag')
     load(suite, 'umptag.tests.test_api')
+    load(suite, 'umptag.tests.test_database')
     return suite
 
 
