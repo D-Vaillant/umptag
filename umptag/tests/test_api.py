@@ -87,6 +87,9 @@ class AddRemove_TagChangeTester(TagChangeTester):
         return  # Because otherwise we'll get LOST
 
 
+    """ NOTE: Well, can't I merge the below two functions? The remove_tag func
+    is checking to see if the tag was added redundantly; I don't want to
+    remove that because, even if it works through apply_tag, I'm paranoid. """
     def test_apply_tag(self):
         """ Adding multiple tags to files. """
         DEBUG = False
@@ -267,6 +270,52 @@ class Orphan_TagChangeTester(TagChangeTester):
                 api.remove_tag(c, d, n, *tg)
             self.assertIsNone(conn.execute(
                 "SELECT * FROM tags WHERE key=? AND value=?", tg).fetchone())
+
+
+class GetInfo_TagChangeTester(TagChangeTester):
+    def test_show_tags(self):
+        """ Testing printing out which tags a file has. """
+        len_fp = len(self.filepaths)
+        tagged_files = defaultdict(set)
+        filed_tags = defaultdict(set)
+        for has_key in [True, False]:
+            for namelen in range(3, randint(4, 10)):  # Avoid duplicates by various lengths.
+                random_tag = make_random_word(a=namelen, b=namelen)
+                if has_key:
+                    random_key = ''
+                    apply_tag = lambda c, d, n: api.apply_tag(c, d, n, random_tag)
+                else:
+                    random_key = make_random_word(a=namelen, b=namelen)
+                    apply_tag = lambda c, d, n: api.apply_tag(c, d, n, random_key, random_tag)
+                # The files we're tagging.
+                files_to_tag = set(os.path.split(choice(self.filepaths))
+                             for _ in range(randint(1, len_fp-2)))
+                filed_tags[(random_key, random_tag)] = files_to_tag
+                for (d, n) in files_to_tag:
+                    tagged_files[(d, n)].add((random_key, random_tag))
+                    with database.get_conn(self.db_name) as c:
+                        apply_tag(c, d, n)
+        with self.subTest("Testing show_tags."):
+            for file, tagged in tagged_files.items():
+                tagged = [(k+'=' if k else '')+t for (k, t) in tagged]
+                tagged_str = ', '.join(tagged)
+                with database.get_conn(self.db_name) as c:
+                    show_output = api.show_tags(c, *file)
+                self.assertEqual(f"File '{os.path.join(d, n)}' has tags: {tagged_str}.",
+                                show_output)
+        with self.subTest("Testing show_files."):
+            for tag_, files_ in filed_tags.items():
+                tag_str = (tag_[0]+'=' if tag_[0] else '')+tag_[1]
+                filed = [os.path.join(d, n) for (d, n) in files_]
+                filed_str = ', '.join(tagged)
+                with database.get_conn(self.db_name) as c:
+                    show_output = api.show_files(c, *tag_)
+                self.assertEqual(f"{tag_str} => {filed_str}.",
+                                show_output)
+
+
+    def test_show_files(self):
+        """ Testing printing out what files have a specific tag. """
 
 
 # Let's redo all of these suckers but with a COMPLETELY DIFFERENT DATABASE NAME

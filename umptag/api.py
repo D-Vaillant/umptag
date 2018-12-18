@@ -48,11 +48,11 @@ def merge_tag(conn, primary_key='', primary_value=None,
 
 
 def show_tags(conn, directory, name):
-    """ Lists the tags applied to target. """
+    """ Lists the tags applied to file. """
     raise NotImplementedError
 
 
-def show_targets(conn, *args, **kwargs):
+def show_files(conn, *args, **kwargs):
     """ Lists the targets with all of the applied tags. """
     raise NotImplementedError
 
