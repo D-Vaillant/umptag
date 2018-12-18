@@ -174,36 +174,44 @@ class Keyed_TagChangeTester(TagChangeTester):
         len_fp = len(self.filepaths)
         # We create a random number of tags and then apply it to a random
         # number of files. We note which files that the tag was applied to.
-        for namelen in range(3, randint(4, 10)):  # Avoid duplicates by various lengths.
-            random_tag = make_random_word(a=namelen, b=namelen)
-            if False:
-                random_key = ''
-                apply_tag = lambda d, n: api.apply_tag(
-                        c, d, n, random_tag)
-                remove_tag = lambda rm_d, rm_n: api.remove_tag(
-                        c, rm_d, rm_n, random_tag)
-            else:
-                random_key = make_random_word(a=namelen, b=namelen)
-                apply_tag = lambda d, n: api.apply_tag(
-                        c, d, n, random_key, random_tag)
-                remove_tag = lambda rm_d, rm_n: api.remove_tag(
-                        c, rm_d, rm_n, random_key, random_tag)
-            # Avoid duplicates by using a set.
-            files_to_tag = set(os.path.split(choice(self.filepaths))
-                    for _ in range(randint(1, len_fp-2)))
-            for (d, n) in files_to_tag:
-                with database.get_conn(self.db_name) as c:
-                    apply_tag(d, n)
-                    # Make sure we actually tagged it.
-                    self.assertIn((d, n), filetags.files_of_tag(c, random_key, random_tag))
-            while files_to_tag:
-                rm_d, rm_n = files_to_tag.pop()
-                with database.get_conn(self.db_name) as c:
-                    remove_tag(rm_d, rm_n)
-                    self.assertNotIn(random_tag, filetags.tags_of_file(c, rm_d, rm_n))
-                    self.assertNotIn((rm_d, rm_n), filetags.files_of_tag(c, random_key, random_tag))
-            with self.subTest(key=random_key, tag=random_tag):
-                self.assertFalse(filetags.files_of_tag(c, random_key, random_tag))
+        for has_key in [True, False]:
+            for namelen in range(3, randint(4, 10)):  # Avoid duplicates by various lengths.
+                random_tag = make_random_word(a=namelen, b=namelen)
+                if has_key:
+                    random_key = ''
+                    apply_tag = lambda d, n: api.apply_tag(
+                            c, d, n, random_tag)
+                    remove_tag = lambda rm_d, rm_n: api.remove_tag(
+                            c, rm_d, rm_n, random_tag)
+                else:
+                    random_key = make_random_word(a=namelen, b=namelen)
+                    apply_tag = lambda d, n: api.apply_tag(
+                            c, d, n, random_key, random_tag)
+                    remove_tag = lambda rm_d, rm_n: api.remove_tag(
+                            c, rm_d, rm_n, random_key, random_tag)
+                # Avoid duplicates by using a set.
+                files_to_tag = set(os.path.split(choice(self.filepaths))
+                        for _ in range(randint(1, len_fp-2)))
+                for (d, n) in files_to_tag:
+                    with database.get_conn(self.db_name) as c:
+                        apply_tag(d, n)
+                        # Make sure we actually tagged it.
+                        self.assertIn((d, n),
+                                filetags.files_of_tag(c, random_key, random_tag))
+                while files_to_tag:
+                    rm_d, rm_n = files_to_tag.pop()
+                    with database.get_conn(self.db_name) as c:
+                        remove_tag(rm_d, rm_n)
+                        self.assertNotIn(random_tag,
+                                filetags.tags_of_file(c, rm_d, rm_n))
+                        self.assertNotIn((rm_d, rm_n),
+                                filetags.files_of_tag(c,
+                                                      random_key,
+                                                      random_tag))
+                with self.subTest(key=random_key, tag=random_tag):
+                    self.assertFalse(filetags.files_of_tag(c,
+                                                           random_key,
+                                                           random_tag))
 
 
 
