@@ -2,6 +2,7 @@ import sqlite3
 import functools
 import os.path
 import sys
+from typing import List
 from . import tags, fs, filetags
 from . import database as db
 
@@ -47,12 +48,12 @@ def merge_tag(conn, primary_key='', primary_value=None,
         remove_tag(conn, d, n, secondary_key, secondary_value)
 
 
-def show_tags(conn, directory, name):
+def show_tags(conn, directory, name) -> List[str]:
     """ Lists the tags applied to file. """
     raise NotImplementedError
 
 
-def show_files(conn, *args, **kwargs):
+def show_files(conn, *args, **kwargs) -> List[str]:
     """ Lists the targets with all of the applied tags. """
     raise NotImplementedError
 
