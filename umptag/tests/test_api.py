@@ -8,8 +8,8 @@ import unittest
 from collections import defaultdict
 from pathlib import Path
 from random import randint, choice
-from . import DBTester, RealFS_DBTester
-from .utilities import make_random_word, get_random_hierarchy
+from . import DBTester, RealFS_DBTester, TestCase
+from .utilities import make_random_word, get_random_hierarchy, mktag
 from .. import (api,
                 fs,
                 tags,
@@ -272,9 +272,41 @@ class Orphan_TagChangeTester(TagChangeTester):
                 "SELECT * FROM tags WHERE key=? AND value=?", tg).fetchone())
 
 
+@unittest.skip("Not even sure if I'm gonna use this.")
+class QueryClass_TagChangeTester(TagChangeTester):
+    def test_tagquery_files(self):
+        d, n = os.path.split(choice(self.filepaths))
+        tg = make_random_word()
+        with database.get_conn(self.db_name) as c:
+            api.apply_tag(c, d, n, tg)
+            files_of_tag = set(filetags.files_of_tag(c, '', tg))
+            tag_query = api.TagQuery(c, tg)
+        self.assertEqual(set(tag_query.files), files_of_tag)
+        return  # Because otherwise we'll get LOST
+
+    def test_tagquery_addition(self):
+        # NOTE: Procedure: Create a tag and a set of tagged files.
+        # Set up two tags with a set of tagged files.
+        t1 = ('', make_random_word())
+        t1_files = set(os.path.split(choice(self.filepaths)) for _ in range(2))
+        t2 = (make_random_word(), make_random_word())
+        t2_files = set(os.path.split(choice(self.filepaths)) for _ in range(2))
+        all_tagged_files = t1_files + t2_files
+        with database.get_conn(self.db_name) as c:
+            for (d, n) in t1_files:
+                api.apply_tag(c, d, n, *t1)
+            for (d, n) in t2_files:
+                api.apply_tag(c, d, n, *t2)
+        tq1 = api.TagQuery(None, *t1)
+        tq2 = api.TagQuery(None, *t2)
+        added_queries = tq1+tq2
+        self.assertEqual(set(added_queries.files), all_tagged_files)
+
+
 class GetInfo_TagChangeTester(TagChangeTester):
-    def test_show_tags(self):
-        """ Testing printing out which tags a file has. """
+    def test_show_tags_and_files(self):
+        """ Tests show_tags and show_files.
+        I was going to do this separately but the setup works pretty well. """
         len_fp = len(self.filepaths)
         tagged_files = defaultdict(set)
         filed_tags = defaultdict(set)
@@ -306,11 +338,13 @@ class GetInfo_TagChangeTester(TagChangeTester):
                 filed = set(os.path.join(d, n) for (d, n) in files_)
                 with database.get_conn(self.db_name) as c:
                     show_output = set(api.show_files(c, *tag_))
+        return
 
 
-    def test_show_files(self):
-        """ Testing printing out what files have a specific tag. """
-        pass
+# TODO make this real :(
+class Parser_Tester(TestCase):
+    def test_parser_echo(self):
+        api.parse_tag_query('foo')
 
 
 def tag_sorter(kv1, kv2):
@@ -336,8 +370,8 @@ def tag_sorter(kv1, kv2):
             
 
 # Let's redo all of these suckers but with a COMPLETELY DIFFERENT DATABASE NAME
-def is_test_method(cls, func):
-    return callable(getattr(cls, func)) and func.startswith('test_')
+# def is_test_method(cls, func):
+#     return callable(getattr(cls, func)) and func.startswith('test_')
 
 def mk_dbrenamed_class(cls):
     class Out(cls):

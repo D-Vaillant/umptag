@@ -55,3 +55,6 @@ def get_random_hierarchy(structure=((2, 2), (lambda: randint(1, 4), 1), (3, 0)))
             dir_hier.append(next_dir_level)
     return (all_files, all_dirs)
 
+
+def mktag(keyed=False):
+    return (make_random_word() if keyed else '', make_random_word())
